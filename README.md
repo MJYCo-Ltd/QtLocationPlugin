@@ -1,0 +1,2 @@
+# QtLocationPlugin
+从QGC中剥离出来的locationPlugin
