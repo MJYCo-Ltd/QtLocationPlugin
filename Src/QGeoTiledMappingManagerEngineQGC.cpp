@@ -13,7 +13,8 @@
 #include "QGeoFileTileCacheQGC.h"
 #include "QGeoTiledMapQGC.h"
 #include "QGCMapUrlEngine.h"
-#include "MapProvider.h"
+#include "TmsMapProvider.h"
+#include "TiandiMapProvider.h"
 #include "QGCMapEngineManager.h"
 
 
@@ -54,6 +55,13 @@ QGeoTiledMappingManagerEngineQGC::QGeoTiledMappingManagerEngineQGC(const QVarian
 
     setTileVersion(kTileVersion);
     setTileSize(QSize(256, 256));
+
+    if (parameters.contains(QStringLiteral("tmsUrl"))) {
+        TmsMapProvider::loadTmsFile(parameters[QStringLiteral("tmsUrl")].toString());
+    }
+    if(parameters.contains(QStringLiteral("TiandiTuKey"))){
+        TiandiMapProvider::_key = parameters[QStringLiteral("TiandiTuKey")].toString();
+    }
 
     QList<QGeoMapType> mapList;
     const QList<SharedMapProvider> providers = UrlFactory::getProviders();

@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/res">
+        <file alias="NoTileBytes.dat">resources/NoTileBytes.dat</file>
+        <file alias="notile.png">resources/notile.png</file>
+    </qresource>
+</RCC>

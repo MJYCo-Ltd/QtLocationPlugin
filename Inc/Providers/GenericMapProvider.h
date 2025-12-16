@@ -10,21 +10,6 @@
 
 #include "MapProvider.h"
 
-class CustomURLMapProvider : public MapProvider
-{
-public:
-    CustomURLMapProvider()
-        : MapProvider(
-            QStringLiteral("CustomURL Custom"),
-            QStringLiteral(""),
-            QStringLiteral(""),
-            AVERAGE_TILE_SIZE,
-            QGeoMapType::CustomMap) {}
-
-private:
-    QString _getURL(int x, int y, int zoom) const final;
-};
-
 class CyberJapanMapProvider : public MapProvider
 {
 protected:

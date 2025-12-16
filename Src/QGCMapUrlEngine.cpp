@@ -22,6 +22,8 @@
 #include "MapboxMapProvider.h"
 #include "ElevationMapProvider.h"
 #include "GaoDeMapProvider.h"
+#include "TiandiMapProvider.h"
+#include "TmsMapProvider.h"
 
 
 Q_LOGGING_CATEGORY(QGCMapUrlEngineLog, "qgc.qtlocationplugin.qgcmapurlengine")
@@ -76,7 +78,10 @@ const QList<SharedMapProvider> UrlFactory::_providers = {
 
     std::make_shared<OpenStreetMapProvider>(),
 
-    std::make_shared<CustomURLMapProvider>(),
+    std::make_shared<TiandiSatelliteMapProvider>(),
+    std::make_shared<TiandiStreetMapProvider>(),
+    std::make_shared<TiandiTerrainMapProvider>(),
+    std::make_shared<TmsMapProvider>(),
 
     std::make_shared<CopernicusElevationProvider>()
 };

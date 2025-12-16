@@ -9,16 +9,6 @@
 #include <QRegularExpression>
 #include "GenericMapProvider.h"
 
-QString CustomURLMapProvider::_getURL(int x, int y, int zoom) const
-{
-    QString url;
-    (void) url.replace("{x}", QString::number(x));
-    (void) url.replace("{y}", QString::number(y));
-    static const QRegularExpression zoomRegExp("\\{(z|zoom)\\}");
-    (void) url.replace(zoomRegExp, QString::number(zoom));
-    return url;
-}
-
 QString CyberJapanMapProvider::_getURL(int x, int y, int zoom) const
 {
     return _mapUrl.arg(_mapName).arg(zoom).arg(x).arg(y).arg(_imageFormat);

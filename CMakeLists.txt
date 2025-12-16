@@ -45,6 +45,8 @@ set(SOURCES
     Src/Providers/GoogleMapProvider.cpp
     Src/Providers/MapboxMapProvider.cpp
     Src/Providers/MapProvider.cpp
+    Src/Providers/TiandiMapProvider.cpp
+    Src/Providers/TmsMapProvider.cpp
 )
 
 set(HEADERS
@@ -73,13 +75,17 @@ set(HEADERS
     Inc/Providers/GoogleMapProvider.h
     Inc/Providers/MapboxMapProvider.h
     Inc/Providers/MapProvider.h
+    Inc/Providers/TiandiMapProvider.h
+    Inc/Providers/TmsMapProvider.h
 )
 
+qt_add_resources(QRC_SOURCES QGCLocation.qrc)
 
 qt_add_plugin(QGCLocation
     CLASS_NAME QGeoServiceProviderFactoryQGC
     ${HEADERS}
     ${SOURCES}
+    ${QRC_SOURCES}
 )
 
 target_link_libraries(QGCLocation
