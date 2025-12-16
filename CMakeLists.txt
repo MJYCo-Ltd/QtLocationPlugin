@@ -17,79 +17,78 @@ find_package(Qt6 REQUIRED COMPONENTS
 
 qt_standard_project_setup(REQUIRES 6.9)
 
-
-# 把源码先收集到一个变量，避免宏内部出现意外的文件名解析
-set(QGCL_LOCATION_SOURCES
-    Providers/BingMapProvider.cpp
-    Providers/BingMapProvider.h
-    Providers/ElevationMapProvider.cpp
-    Providers/ElevationMapProvider.h
-    Providers/EsriMapProvider.cpp
-    Providers/EsriMapProvider.h
-    Providers/GenericMapProvider.cpp
-    Providers/GenericMapProvider.h
-    Providers/GoogleMapProvider.cpp
-    Providers/GoogleMapProvider.h
-    Providers/MapboxMapProvider.cpp
-    Providers/MapboxMapProvider.h
-    Providers/MapProvider.cpp
-    Providers/MapProvider.h
-    QGCCachedTileSet.cpp
-    QGCCachedTileSet.h
-    QGCCacheTile.h
-    QGCMapEngine.cpp
-    QGCMapEngine.h
-    QGCMapEngineManager.cc
-    QGCMapEngineManager.h
-    QGCMapTasks.h
-    QGCMapUrlEngine.cpp
-    QGCMapUrlEngine.h
-    QGCTile.h
-    QGCTileCacheWorker.cpp
-    QGCTileCacheWorker.h
-    QGCTileSet.h
-    QGeoFileTileCacheQGC.cpp
-    QGeoFileTileCacheQGC.h
-    QGeoMapReplyQGC.cpp
-    QGeoMapReplyQGC.h
-    QGeoServiceProviderPluginQGC.cpp
-    QGeoServiceProviderPluginQGC.h
-    QGeoTiledMappingManagerEngineQGC.cpp
-    QGeoTiledMappingManagerEngineQGC.h
-    QGeoTiledMapQGC.cpp
-    QGeoTiledMapQGC.h
-    QGeoTileFetcherQGC.cpp
-    QGeoTileFetcherQGC.h
-    QmlObjectListModel.cc
-    QmlObjectListModel.h
-    QGCFileDownload.cc
-    QGCFileDownload.h
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc/Providers
 )
+
+# 设置源文件
+set(SOURCES
+    Src/QGCCachedTileSet.cpp
+    Src/QGCFileDownload.cc
+    Src/QGCMapEngine.cpp
+    Src/QGCMapEngineManager.cc
+    Src/QGCMapUrlEngine.cpp
+    Src/QGCTileCacheWorker.cpp
+    Src/QGeoFileTileCacheQGC.cpp
+    Src/QGeoMapReplyQGC.cpp
+    Src/QGeoServiceProviderPluginQGC.cpp
+    Src/QGeoTiledMappingManagerEngineQGC.cpp
+    Src/QGeoTiledMapQGC.cpp
+    Src/QGeoTileFetcherQGC.cpp
+    Src/QmlObjectListModel.cc
+    Src/Providers/BingMapProvider.cpp
+    Src/Providers/ElevationMapProvider.cpp
+    Src/Providers/EsriMapProvider.cpp
+    Src/Providers/GenericMapProvider.cpp
+    Src/Providers/GoogleMapProvider.cpp
+    Src/Providers/MapboxMapProvider.cpp
+    Src/Providers/MapProvider.cpp
+)
+
+set(HEADERS
+    Inc/QGCCachedTileSet.h
+    Inc/QGCCacheTile.h
+    Inc/QGCFileDownload.h
+    Inc/QGCMapEngine.h
+    Inc/QGCMapEngineManager.h
+    Inc/QGCMapTasks.h
+    Inc/QGCMapUrlEngine.h
+    Inc/QGCTile.h
+    Inc/QGCTileCacheWorker.h
+    Inc/QGCTileSet.h
+    Inc/QGeoFileTileCacheQGC.h
+    Inc/QGeoMapReplyQGC.h
+    Inc/QGeoServiceProviderPluginQGC.h
+    Inc/QGeoTiledMappingManagerEngineQGC.h
+    Inc/QGeoTiledMapQGC.h
+    Inc/QGeoTileFetcherQGC.h
+    Inc/QmlObjectListModel.h
+    Inc/Providers/BingMapProvider.h
+    Inc/Providers/ElevationMapProvider.h
+    Inc/Providers/EsriMapProvider.h
+    Inc/Providers/GenericMapProvider.h
+    Inc/Providers/GoogleMapProvider.h
+    Inc/Providers/MapboxMapProvider.h
+    Inc/Providers/MapProvider.h
+)
+
 
 qt_add_plugin(QGCLocation
     CLASS_NAME QGeoServiceProviderFactoryQGC
-    OUTPUT_TARGETS QGCLocation_targets
-    ${QGCL_LOCATION_SOURCES}
+    ${HEADERS}
+    ${SOURCES}
 )
 
 target_link_libraries(QGCLocation
     PRIVATE
-        Qt6::Positioning
         Qt6::LocationPrivate
-        Qt6::Sql
     PUBLIC
         Qt6::Core
         Qt6::Location
         Qt6::Network
-)
-
-# 使用生成表达式，在“构建时”使用源码目录，在“安装/导出时”使用安装目录（避免导出时引用源码目录）
-target_include_directories(QGCLocation
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Providers>
-        $<INSTALL_INTERFACE:include/QGCLocation>
+        Qt6::Positioning
+        Qt6::Sql
 )
 
 get_filename_component(_qt_prefix "${Qt6_DIR}/../../.." ABSOLUTE)
