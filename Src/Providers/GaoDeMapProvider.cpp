@@ -11,6 +11,5 @@ QString GaoDeMapProvider::_getURL(int x, int y, int zoom) const
         .arg(y)
         .arg(zoom);
 
-    qDebug()<<stemp;
     return(stemp);
 }

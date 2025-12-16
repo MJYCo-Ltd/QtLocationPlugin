@@ -9,7 +9,6 @@ QString TiandiMapProvider::_getURL(int x, int y, int zoom) const {
                         .arg(y)
                         .arg(x)
                         .arg(_key);
-    qDebug()<<stemp;
 
     return (stemp);
 }

@@ -6,7 +6,7 @@ QString TmsMapProvider::_mapUrl;
 
 TmsMapProvider::TmsMapProvider()
     : MapProvider(QStringLiteral("TmsLocal"), QStringLiteral(""),
-                  QStringLiteral("jpg")) {}
+                  QStringLiteral("")) {}
 
 void TmsMapProvider::loadTmsFile(const QString &sTmsFileName) {
     _mapUrl = sTmsFileName.left(sTmsFileName.lastIndexOf('/'));
@@ -62,7 +62,5 @@ QString TmsMapProvider::_getURL(int x, int y, int zoom) const {
                        .arg(x)
                        .arg((1 << zoom) - 1 - y)
                        .arg(_tmsMeta.extension);
-
-    qDebug() << "_getURL:" << path;
     return (path);
 }
