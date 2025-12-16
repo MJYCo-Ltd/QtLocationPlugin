@@ -40,6 +40,7 @@ set(SOURCES
     Src/Providers/BingMapProvider.cpp
     Src/Providers/ElevationMapProvider.cpp
     Src/Providers/EsriMapProvider.cpp
+    Src/Providers/GaoDeMapProvider.cpp
     Src/Providers/GenericMapProvider.cpp
     Src/Providers/GoogleMapProvider.cpp
     Src/Providers/MapboxMapProvider.cpp
@@ -67,6 +68,7 @@ set(HEADERS
     Inc/Providers/BingMapProvider.h
     Inc/Providers/ElevationMapProvider.h
     Inc/Providers/EsriMapProvider.h
+    Inc/Providers/GaoDeMapProvider.h
     Inc/Providers/GenericMapProvider.h
     Inc/Providers/GoogleMapProvider.h
     Inc/Providers/MapboxMapProvider.h

@@ -21,6 +21,7 @@
 #include "EsriMapProvider.h"
 #include "MapboxMapProvider.h"
 #include "ElevationMapProvider.h"
+#include "GaoDeMapProvider.h"
 
 
 Q_LOGGING_CATEGORY(QGCMapUrlEngineLog, "qgc.qtlocationplugin.qgcmapurlengine")
@@ -33,6 +34,8 @@ const QList<SharedMapProvider> UrlFactory::_providers = {
     std::make_shared<GoogleHybridMapProvider>(),
     std::make_shared<GoogleLabelsMapProvider>(),
 #endif
+    std::make_shared<GaoDeStreetMapProvider>(),
+    std::make_shared<GaoDeSatelliteMapProvider>(),
     std::make_shared<BingRoadMapProvider>(),
     std::make_shared<BingSatelliteMapProvider>(),
     std::make_shared<BingHybridMapProvider>(),
