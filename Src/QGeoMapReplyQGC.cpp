@@ -33,8 +33,6 @@ QGeoTiledMapReplyQGC::QGeoTiledMapReplyQGC(QNetworkAccessManager *networkManager
     , _networkManager(networkManager)
     , _request(request)
 {
-    // qCDebug(QGeoTiledMapReplyQGCLog) << Q_FUNC_INFO << this;
-
     _initDataFromResources();
 
     (void) connect(this, &QGeoTiledMapReplyQGC::errorOccurred, this, [this](QGeoTiledMapReply::Error error, const QString &errorString) {
@@ -52,7 +50,6 @@ QGeoTiledMapReplyQGC::QGeoTiledMapReplyQGC(QNetworkAccessManager *networkManager
 
 QGeoTiledMapReplyQGC::~QGeoTiledMapReplyQGC()
 {
-    // qCDebug(QGeoTiledMapReplyQGCLog) << Q_FUNC_INFO << this;
 }
 
 void QGeoTiledMapReplyQGC::_initDataFromResources()

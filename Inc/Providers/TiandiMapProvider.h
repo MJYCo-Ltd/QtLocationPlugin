@@ -41,7 +41,7 @@ public:
 class TiandiTerrainMapProvider : public TiandiMapProvider {
 public:
     TiandiTerrainMapProvider()
-        : TiandiMapProvider(QStringLiteral("天地图卫星"), "ter_w",
+        : TiandiMapProvider(QStringLiteral("天地图高程"), "ter_w",
                             QGeoMapType::TerrainMap) {}
 };
 #endif // TIANDIMAPPROVIDER_H

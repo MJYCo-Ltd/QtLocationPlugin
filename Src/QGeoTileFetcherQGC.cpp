@@ -25,18 +25,10 @@ QGeoTileFetcherQGC::QGeoTileFetcherQGC(QNetworkAccessManager *networkManager, co
     , m_networkManager(networkManager)
 {
     Q_CHECK_PTR(networkManager);
-
-    // qCDebug(QGeoTileFetcherQGCLog) << Q_FUNC_INFO << this;
-
-    // TODO: Allow useragent override again
-    /*if (parameters.contains(QStringLiteral("useragent"))) {
-        setUserAgent(parameters.value(QStringLiteral("useragent")).toString().toLatin1());
-    }*/
 }
 
 QGeoTileFetcherQGC::~QGeoTileFetcherQGC()
 {
-    // qCDebug(QGeoTileFetcherQGCLog) << Q_FUNC_INFO << this;
 }
 
 QGeoTiledMapReply* QGeoTileFetcherQGC::getTileImage(const QGeoTileSpec &spec)
@@ -46,9 +38,9 @@ QGeoTiledMapReply* QGeoTileFetcherQGC::getTileImage(const QGeoTileSpec &spec)
         return nullptr;
     }
 
-    /*if (spec.zoom() > provider->maximumZoomLevel() || spec.zoom() < provider->minimumZoomLevel()) {
+    if (spec.zoom() > provider->maximumZoomLevel() || spec.zoom() < provider->minimumZoomLevel()) {
         return nullptr;
-    }*/
+    }
 
     const QNetworkRequest request = getNetworkRequest(spec.mapId(), spec.x(), spec.y(), spec.zoom());
     if (request.url().isEmpty()) {

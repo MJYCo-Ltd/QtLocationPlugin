@@ -9,43 +9,32 @@
 
 #pragma once
 
-#include <QtLocation/private/qgeomaptype_p.h>
 #include <QtCore/QByteArray>
-#include <QtCore/QString>
 #include <QtCore/QLoggingCategory>
+#include <QtCore/QString>
+#include <QtLocation/private/qgeomaptype_p.h>
 
 #include "QGCTileSet.h"
 
 Q_DECLARE_LOGGING_CATEGORY(MapProviderLog)
 
-// qgeomaptype_p.h
-/*enum MapStyle {
-    NoMap = 0,
-    StreetMap,
-    SatelliteMapDay,
-    SatelliteMapNight,
-    TerrainMap,
-    HybridMap,
-    TransitMap,
-    GrayStreetMap,
-    PedestrianMap,
-    CarNavigationMap,
-    CycleMap,
-    CustomMap = 100
-};*/
-
-#define MAX_MAP_ZOOM 23.0
+#define MAX_MAP_ZOOM 19.0
 static constexpr const quint32 AVERAGE_TILE_SIZE = 13652;
 
 // TODO: Inherit from QGeoMapType
-class MapProvider
-{
+class MapProvider {
 public:
-    MapProvider(const QString &mapName, const QString &referrer, const QString &imageFormat, quint32 averageSize = AVERAGE_TILE_SIZE,
-                QGeoMapType::MapStyle mapStyle = QGeoMapType::CustomMap);
+    MapProvider(const QString &mapName, const QString &referrer,
+                const QString &imageFormat,
+                quint32 averageSize = AVERAGE_TILE_SIZE,
+                QGeoMapType::MapStyle mapStyle = QGeoMapType::CustomMap,
+                int minimumZoomLevel = 1, int maximumZoomLevel = 19);
     virtual ~MapProvider();
 
     QUrl getTileURL(int x, int y, int zoom) const;
+
+    int maximumZoomLevel() const { return (_maximumZoom); }
+    int minimumZoomLevel() const { return (_minimumZoom); }
 
     QString getImageFormat(QByteArrayView image) const;
 
@@ -53,9 +42,9 @@ public:
     quint32 getAverageSize() const { return _averageSize; }
 
     QGeoMapType::MapStyle getMapStyle() const { return _mapStyle; }
-    const QString& getMapName() const { return _mapName; }
+    const QString &getMapName() const { return _mapName; }
     int getMapId() const { return _mapId; }
-    const QString& getReferrer() const { return _referrer; }
+    const QString &getReferrer() const { return _referrer; }
     virtual QByteArray getToken() const { return QByteArray(); }
 
     virtual int long2tileX(double lon, int z) const;
@@ -81,6 +70,8 @@ protected:
     const QGeoMapType::MapStyle _mapStyle;
     const QString _language;
     const int _mapId;
+    const int _minimumZoom{1};
+    const int _maximumZoom{19};
 
 private:
     static int _mapIdIndex;

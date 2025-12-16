@@ -26,12 +26,10 @@ Q_LOGGING_CATEGORY(QGCTileCacheWorkerLog, "qgc.qtlocationplugin.qgctilecachework
 QGCCacheWorker::QGCCacheWorker(QObject *parent)
     : QThread(parent)
 {
-    // qCDebug(QGCTileCacheWorkerLog) << Q_FUNC_INFO << this;
 }
 
 QGCCacheWorker::~QGCCacheWorker()
 {
-    // qCDebug(QGCTileCacheWorkerLog) << Q_FUNC_INFO << this;
 }
 
 void QGCCacheWorker::stop()
