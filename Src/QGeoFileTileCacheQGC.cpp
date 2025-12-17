@@ -46,8 +46,6 @@ QGeoFileTileCacheQGC::~QGeoFileTileCacheQGC() {
 #ifdef QT_DEBUG
     // printStats();
 #endif
-
-    // qCDebug(QGeoFileTileCacheQGCLog) << Q_FUNC_INFO << this;
 }
 
 uint32_t QGeoFileTileCacheQGC::_getMemLimit(const QVariantMap &parameters) {
