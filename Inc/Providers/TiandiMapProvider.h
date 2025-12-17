@@ -10,7 +10,7 @@ protected:
     TiandiMapProvider(const QString &mapName, QString type,
                       QGeoMapType::MapStyle mapType)
         : MapProvider(mapName, QStringLiteral("https://map.tianditu.gov.cn/"),
-                      QStringLiteral(""), AVERAGE_TILE_SIZE, mapType),
+                      QStringLiteral(""), AVERAGE_TILE_SIZE, mapType,1,18),
         _type(type){}
 
 private:

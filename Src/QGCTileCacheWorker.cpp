@@ -252,6 +252,7 @@ void QGCCacheWorker::_saveTile(QGCMapTask *mtask)
     query.addBindValue(task->tile()->type());
     query.addBindValue(QDateTime::currentSecsSinceEpoch());
     if (!query.exec()) {
+        qCWarning(QGCTileCacheWorkerLog) << "Map Cache SQL error (add data into Tiles):" << query.lastError().text();
         // Tile was already there.
         // QtLocation some times requests the same tile twice in a row. The first is saved, the second is already there.
         return;

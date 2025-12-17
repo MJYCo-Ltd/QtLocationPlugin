@@ -9,23 +9,23 @@
 
 #include "QGeoFileTileCacheQGC.h"
 #include "QGCMapEngine.h"
-#include "QGCMapUrlEngine.h"
 #include "QGCMapTasks.h"
+#include "QGCMapUrlEngine.h"
 
-
-#include <QtCore/QStandardPaths>
-#include <QtCore/QLoggingCategory>
 #include <QtCore/QDir>
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QStandardPaths>
 
-Q_LOGGING_CATEGORY(QGeoFileTileCacheQGCLog, "qgc.qtlocationplugin.qgeofiletilecacheqgc")
+Q_LOGGING_CATEGORY(QGeoFileTileCacheQGCLog,
+                   "qgc.qtlocationplugin.qgeofiletilecacheqgc")
 
 QString QGeoFileTileCacheQGC::_databaseFilePath;
 QString QGeoFileTileCacheQGC::_cachePath;
 bool QGeoFileTileCacheQGC::_cacheWasReset = false;
 
-QGeoFileTileCacheQGC::QGeoFileTileCacheQGC(const QVariantMap &parameters, QObject *parent)
-    : QGeoFileTileCache(baseCacheDirectory(), parent)
-{
+QGeoFileTileCacheQGC::QGeoFileTileCacheQGC(const QVariantMap &parameters,
+                                           QObject *parent)
+    : QGeoFileTileCache(baseCacheDirectory(), parent) {
     // qCDebug(QGeoFileTileCacheQGCLog) << Q_FUNC_INFO << this;
 
     setCostStrategyDisk(QGeoFileTileCache::ByteSize);
@@ -37,15 +37,12 @@ QGeoFileTileCacheQGC::QGeoFileTileCacheQGC(const QVariantMap &parameters, QObjec
     setExtraTextureUsage(_getDefaultExtraTexture() - minTextureUsage());
 
     static std::once_flag cacheInit;
-    std::call_once(cacheInit, [this]() {
-        _initCache();
-    });
+    std::call_once(cacheInit, [this]() { _initCache(); });
 
     directory_ = _getCachePath(parameters);
 }
 
-QGeoFileTileCacheQGC::~QGeoFileTileCacheQGC()
-{
+QGeoFileTileCacheQGC::~QGeoFileTileCacheQGC() {
 #ifdef QT_DEBUG
     // printStats();
 #endif
@@ -53,12 +50,13 @@ QGeoFileTileCacheQGC::~QGeoFileTileCacheQGC()
     // qCDebug(QGeoFileTileCacheQGCLog) << Q_FUNC_INFO << this;
 }
 
-uint32_t QGeoFileTileCacheQGC::_getMemLimit(const QVariantMap &parameters)
-{
+uint32_t QGeoFileTileCacheQGC::_getMemLimit(const QVariantMap &parameters) {
     uint32_t memLimit = 0;
     if (parameters.contains(QStringLiteral("mapping.cache.memory.size"))) {
         bool ok = false;
-        memLimit = parameters.value(QStringLiteral("mapping.cache.memory.size")).toString().toUInt(&ok);
+        memLimit = parameters.value(QStringLiteral("mapping.cache.memory.size"))
+                       .toString()
+                       .toUInt(&ok);
         if (!ok) {
             memLimit = 0;
         }
@@ -83,48 +81,44 @@ uint32_t QGeoFileTileCacheQGC::_getMemLimit(const QVariantMap &parameters)
     return memLimit;
 }
 
-quint32 QGeoFileTileCacheQGC::_getMaxMemCacheSetting()
-{
-    return 1024*1024;
-}
+quint32 QGeoFileTileCacheQGC::_getMaxMemCacheSetting() { return 1024 * 1024; }
 
-quint32 QGeoFileTileCacheQGC::getMaxDiskCacheSetting()
-{
-    return 1024;
-}
+quint32 QGeoFileTileCacheQGC::getMaxDiskCacheSetting() { return 1024; }
 
-void QGeoFileTileCacheQGC::cacheTile(const QString &type, int x, int y, int z, const QByteArray &image, const QString &format, qulonglong set)
-{
+void QGeoFileTileCacheQGC::cacheTile(const QString &type, int x, int y, int z,
+                                     const QByteArray &image,
+                                     const QString &format, qulonglong set) {
     const QString hash = UrlFactory::getTileHash(type, x, y, z);
     cacheTile(type, hash, image, format, set);
 }
 
-void QGeoFileTileCacheQGC::cacheTile(const QString &type, const QString &hash, const QByteArray &image, const QString &format, qulonglong set)
-{
-    if (!true) {
-        QGCCacheTile* const tile = new QGCCacheTile(hash, image, format, type, set);
-        QGCSaveTileTask* const task = new QGCSaveTileTask(tile);
-        (void) getQGCMapEngine()->addTask(task);
-    }
+void QGeoFileTileCacheQGC::cacheTile(const QString &type, const QString &hash,
+                                     const QByteArray &image,
+                                     const QString &format, qulonglong set) {
+    QGCCacheTile *const tile = new QGCCacheTile(hash, image, format, type, set);
+    QGCSaveTileTask *const task = new QGCSaveTileTask(tile);
+    (void)getQGCMapEngine()->addTask(task);
 }
 
-QGCFetchTileTask* QGeoFileTileCacheQGC::createFetchTileTask(const QString &type, int x, int y, int z)
-{
+QGCFetchTileTask *QGeoFileTileCacheQGC::createFetchTileTask(const QString &type,
+                                                            int x, int y,
+                                                            int z) {
     const QString hash = UrlFactory::getTileHash(type, x, y, z);
-    QGCFetchTileTask* const task = new QGCFetchTileTask(hash);
+    QGCFetchTileTask *const task = new QGCFetchTileTask(hash);
     return task;
 }
 
-QString QGeoFileTileCacheQGC::_getCachePath(const QVariantMap &parameters)
-{
+QString QGeoFileTileCacheQGC::_getCachePath(const QVariantMap &parameters) {
     QString cacheDir;
     if (parameters.contains(QStringLiteral("mapping.cache.directory"))) {
-        cacheDir = parameters.value(QStringLiteral("mapping.cache.directory")).toString();
+        cacheDir =
+            parameters.value(QStringLiteral("mapping.cache.directory")).toString();
     } else {
         cacheDir = _cachePath + QLatin1String("/providers");
         if (!QFileInfo::exists(cacheDir)) {
             if (!QDir::root().mkpath(cacheDir)) {
-                qCWarning(QGeoFileTileCacheQGCLog) << "Could not create mapping disk cache directory:" << cacheDir;
+                qCWarning(QGeoFileTileCacheQGCLog)
+                    << "Could not create mapping disk cache directory:" << cacheDir;
                 cacheDir = QDir::homePath() + QStringLiteral("/.qgcmapscache/");
             }
         }
@@ -132,7 +126,8 @@ QString QGeoFileTileCacheQGC::_getCachePath(const QVariantMap &parameters)
 
     if (!QFileInfo::exists(cacheDir)) {
         if (!QDir::root().mkpath(cacheDir)) {
-            qCWarning(QGeoFileTileCacheQGCLog) << "Could not create mapping disk cache directory:" << cacheDir;
+            qCWarning(QGeoFileTileCacheQGCLog)
+                << "Could not create mapping disk cache directory:" << cacheDir;
             cacheDir.clear();
         }
     }
@@ -140,15 +135,17 @@ QString QGeoFileTileCacheQGC::_getCachePath(const QVariantMap &parameters)
     return cacheDir;
 }
 
-bool QGeoFileTileCacheQGC::_wipeDirectory(const QString &dirPath)
-{
+bool QGeoFileTileCacheQGC::_wipeDirectory(const QString &dirPath) {
     bool result = true;
 
     const QDir dir(dirPath);
     if (dir.exists(dirPath)) {
         _cacheWasReset = true;
 
-        const QFileInfoList fileList = dir.entryInfoList(QDir::NoDotAndDotDot | QDir::System | QDir::Hidden | QDir::AllDirs | QDir::Files, QDir::DirsFirst);
+        const QFileInfoList fileList =
+            dir.entryInfoList(QDir::NoDotAndDotDot | QDir::System | QDir::Hidden |
+                                                             QDir::AllDirs | QDir::Files,
+                                                         QDir::DirsFirst);
         for (const QFileInfo &info : fileList) {
             if (info.isDir()) {
                 result = _wipeDirectory(info.absoluteFilePath());
@@ -166,38 +163,42 @@ bool QGeoFileTileCacheQGC::_wipeDirectory(const QString &dirPath)
     return result;
 }
 
-void QGeoFileTileCacheQGC::_wipeOldCaches()
-{
+void QGeoFileTileCacheQGC::_wipeOldCaches() {
     const QStringList oldCaches = {"/QGCMapCache55", "/QGCMapCache100"};
     for (const QString &cache : oldCaches) {
         QString oldCacheDir;
-        #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
-            oldCacheDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-        #else
-            oldCacheDir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation);
-        #endif
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+        oldCacheDir =
+            QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+#else
+        oldCacheDir =
+            QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation);
+#endif
         oldCacheDir += cache;
         _wipeDirectory(oldCacheDir);
     }
 }
 
-void QGeoFileTileCacheQGC::_initCache()
-{
+void QGeoFileTileCacheQGC::_initCache() {
     _wipeOldCaches();
 
     // QString cacheDir = QAbstractGeoTileCache::baseCacheDirectory()
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
-    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString cacheDir =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
 #else
-    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation);
+    QString cacheDir =
+        QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation);
 #endif
     cacheDir += QStringLiteral("/QGCMapCache") + QString(kCachePathVersion);
     if (!QDir::root().mkpath(cacheDir)) {
-        qCWarning(QGeoFileTileCacheQGCLog) << "Could not create mapping disk cache directory:" << cacheDir;
+        qCWarning(QGeoFileTileCacheQGCLog)
+            << "Could not create mapping disk cache directory:" << cacheDir;
 
         cacheDir = QDir::homePath() + QStringLiteral("/.qgcmapscache/");
         if (!QDir::root().mkpath(cacheDir)) {
-            qCWarning(QGeoFileTileCacheQGCLog) << "Could not create mapping disk cache directory:" << cacheDir;
+            qCWarning(QGeoFileTileCacheQGCLog)
+                << "Could not create mapping disk cache directory:" << cacheDir;
             cacheDir.clear();
         }
     }
@@ -208,6 +209,7 @@ void QGeoFileTileCacheQGC::_initCache()
 
         qCDebug(QGeoFileTileCacheQGCLog) << "Map Cache in:" << _databaseFilePath;
     } else {
-        qCCritical(QGeoFileTileCacheQGCLog) << "Could not find suitable map cache directory.";
+        qCCritical(QGeoFileTileCacheQGCLog)
+            << "Could not find suitable map cache directory.";
     }
 }

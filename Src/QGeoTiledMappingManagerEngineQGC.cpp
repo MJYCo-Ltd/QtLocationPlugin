@@ -66,6 +66,9 @@ QGeoTiledMappingManagerEngineQGC::QGeoTiledMappingManagerEngineQGC(const QVarian
     QList<QGeoMapType> mapList;
     const QList<SharedMapProvider> providers = UrlFactory::getProviders();
     for (const SharedMapProvider &provider : providers) {
+        QVariantMap variantMap;
+        variantMap.insert("minimumZoomLevel",provider->minimumZoomLevel());
+        variantMap.insert("maximumZoomLevel", provider->maximumZoomLevel());
         const QGeoMapType map = QGeoMapType(
             provider->getMapStyle(),
             provider->getMapName(),
@@ -74,7 +77,8 @@ QGeoTiledMappingManagerEngineQGC::QGeoTiledMappingManagerEngineQGC(const QVarian
             false,
             provider->getMapId(),
             QByteArrayLiteral("QGroundControl"),
-            cameraCapabilities()
+            cameraCapabilities(),
+            variantMap
         );
         (void) mapList.append(map);
     }
