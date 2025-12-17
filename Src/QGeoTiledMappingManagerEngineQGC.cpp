@@ -6,18 +6,6 @@
  * COPYING.md in the root of the source code directory.
  *
  ****************************************************************************/
-
-#include "QGeoTiledMappingManagerEngineQGC.h"
-#include "QGCMapEngine.h"
-#include "QGeoTileFetcherQGC.h"
-#include "QGeoFileTileCacheQGC.h"
-#include "QGeoTiledMapQGC.h"
-#include "QGCMapUrlEngine.h"
-#include "TmsMapProvider.h"
-#include "TiandiMapProvider.h"
-#include "QGCMapEngineManager.h"
-
-
 #include <mutex>
 
 #include <QtCore/QDir>
@@ -28,6 +16,14 @@
 #include <QtLocation/private/qgeomaptype_p.h>
 #include <QtLocation/private/qgeotiledmap_p.h>
 #include <QtLocation/private/qgeofiletilecache_p.h>
+#include "QGeoTiledMappingManagerEngineQGC.h"
+#include "QGCMapEngine.h"
+#include "QGeoTileFetcherQGC.h"
+#include "QGeoFileTileCacheQGC.h"
+#include "QGeoTiledMapQGC.h"
+#include "QGCMapUrlEngine.h"
+#include "TmsMapProvider.h"
+#include "TiandiMapProvider.h"
 
 Q_LOGGING_CATEGORY(QGeoTiledMappingManagerEngineQGCLog, "qgc.qtlocationplugin.qgeotiledmappingmanagerengineqgc")
 
