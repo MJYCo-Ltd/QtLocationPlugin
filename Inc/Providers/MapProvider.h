@@ -18,7 +18,7 @@
 
 Q_DECLARE_LOGGING_CATEGORY(MapProviderLog)
 
-#define MAX_MAP_ZOOM 19.0
+#define MAX_MAP_ZOOM 21
 static constexpr const quint32 AVERAGE_TILE_SIZE = 13652;
 
 // TODO: Inherit from QGeoMapType
@@ -28,7 +28,7 @@ public:
                 const QString &imageFormat,
                 quint32 averageSize = AVERAGE_TILE_SIZE,
                 QGeoMapType::MapStyle mapStyle = QGeoMapType::CustomMap,
-                int minimumZoomLevel = 1, int maximumZoomLevel = 19);
+                int minimumZoomLevel = 1, int maximumZoomLevel = MAX_MAP_ZOOM);
     virtual ~MapProvider();
 
     QUrl getTileURL(int x, int y, int zoom) const;
@@ -70,8 +70,8 @@ protected:
     const QGeoMapType::MapStyle _mapStyle;
     const QString _language;
     const int _mapId;
-    const int _minimumZoom{1};
-    const int _maximumZoom{19};
+    const int _minimumZoom;
+    const int _maximumZoom;
 
 private:
     static int _mapIdIndex;
