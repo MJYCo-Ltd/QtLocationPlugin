@@ -36,8 +36,8 @@ Map {
         }
 }
 ```
-> [!WARNING] 使用此代码务必遵循以下许可
-> 
+> [!WARNING] 
+> 使用此代码务必遵循以下许可
 >
 > # QGroundControl License Information
 > 
