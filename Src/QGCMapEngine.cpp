@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 /**
  * @file
  *   @brief Map Tile Cache
@@ -17,81 +16,98 @@
  */
 
 #include "QGCMapEngine.h"
-#include "QGCCachedTileSet.h"
-#include "QGCTileCacheWorker.h"
-#include "QGeoFileTileCacheQGC.h"
-#include "QGCMapTasks.h"
-#include "QGCTileSet.h"
-#include "QGCTile.h"
 #include "QGCCacheTile.h"
+#include "QGCCachedTileSet.h"
+#include "QGCMapTasks.h"
+#include "QGCTile.h"
+#include "QGCTileCacheWorker.h"
+#include "QGCTileSet.h"
+#include "QGeoFileTileCacheQGC.h"
 
-
+#include <QCoreApplication>
+#include <QMetaObject>
 #include <QtCore/qapplicationstatic.h>
 
 Q_LOGGING_CATEGORY(QGCMapEngineLog, "qgc.qtlocationplugin.qgcmapengine")
 
-Q_DECLARE_METATYPE(QList<QGCTile*>)
+Q_DECLARE_METATYPE(QList<QGCTile *>)
 
 Q_APPLICATION_STATIC(QGCMapEngine, _mapEngine);
 
-QGCMapEngine *getQGCMapEngine()
-{
-    return QGCMapEngine::instance();
-}
+QGCMapEngine *getQGCMapEngine() { return QGCMapEngine::instance(); }
 
 QGCMapEngine::QGCMapEngine(QObject *parent)
-    : QObject(parent)
-    , m_worker(new QGCCacheWorker(this))
-{
+    : QObject(parent), m_worker(new QGCCacheWorker(this)) {
     // qCDebug(QGCMapEngineLog) << Q_FUNC_INFO << this;
 
-    (void) qRegisterMetaType<QGCMapTask::TaskType>("TaskType");
-    (void) qRegisterMetaType<QGCTile>("QGCTile");
-    (void) qRegisterMetaType<QList<QGCTile*>>("QList<QGCTile*>");
-    (void) qRegisterMetaType<QGCTileSet>("QGCTileSet");
-    (void) qRegisterMetaType<QGCCacheTile>("QGCCacheTile");
+    (void)qRegisterMetaType<QGCMapTask::TaskType>("TaskType");
+    (void)qRegisterMetaType<QGCTile>("QGCTile");
+    (void)qRegisterMetaType<QList<QGCTile *>>("QList<QGCTile*>");
+    (void)qRegisterMetaType<QGCTileSet>("QGCTileSet");
+    (void)qRegisterMetaType<QGCCacheTile>("QGCCacheTile");
 
-    (void) connect(m_worker, &QGCCacheWorker::updateTotals, this, &QGCMapEngine::_updateTotals);
+    (void)connect(m_worker, &QGCCacheWorker::updateTotals, this,
+                   &QGCMapEngine::_updateTotals);
+
+    // 在应用退出前，确保 worker 在 QCoreApplication 被销毁之前停止并断开 DB
+    if (QCoreApplication::instance()) {
+        connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this,
+                [this]() { shutdown(); });
+    }
 }
 
-QGCMapEngine::~QGCMapEngine()
-{
-    (void) disconnect(m_worker);
-    m_worker->stop();
-    m_worker->wait();
-
-    // qCDebug(QGCMapEngineLog) << Q_FUNC_INFO << this;
+QGCMapEngine::~QGCMapEngine() {
+    (void)disconnect(m_worker);
+    if (m_worker->isRunning()) {
+        m_worker->stop();
+        m_worker->wait();
+    }
 }
 
-QGCMapEngine *QGCMapEngine::instance()
-{
-    return _mapEngine();
-}
+QGCMapEngine *QGCMapEngine::instance() { return _mapEngine(); }
 
-void QGCMapEngine::init(const QString &databasePath)
-{
+void QGCMapEngine::init(const QString &databasePath) {
     m_worker->setDatabaseFile(databasePath);
 
-    QGCMapTask* const task = new QGCMapTask(QGCMapTask::taskInit);
-    (void) addTask(task);
+    QGCMapTask *const task = new QGCMapTask(QGCMapTask::taskInit);
+    (void)addTask(task);
 }
 
-bool QGCMapEngine::addTask(QGCMapTask *task)
-{
+bool QGCMapEngine::addTask(QGCMapTask *task) {
     return m_worker->enqueueTask(task);
 }
 
-void QGCMapEngine::_updateTotals(quint32 totaltiles, quint64 totalsize, quint32 defaulttiles, quint64 defaultsize)
-{
+void QGCMapEngine::_updateTotals(quint32 totaltiles, quint64 totalsize,
+                                 quint32 defaulttiles, quint64 defaultsize) {
     emit updateTotals(totaltiles, totalsize, defaulttiles, defaultsize);
 
-    const quint64 maxSize = static_cast<quint64>(QGeoFileTileCacheQGC::getMaxDiskCacheSetting()) * pow(1024, 2);
+    const quint64 maxSize =
+        static_cast<quint64>(QGeoFileTileCacheQGC::getMaxDiskCacheSetting()) *
+        pow(1024, 2);
     if (!m_prunning && (defaultsize > maxSize)) {
         m_prunning = true;
 
         const quint64 amountToPrune = defaultsize - maxSize;
-        QGCPruneCacheTask* const task = new QGCPruneCacheTask(amountToPrune);
-        (void) connect(task, &QGCPruneCacheTask::pruned, this, &QGCMapEngine::_pruned);
-        (void) addTask(task);
+        QGCPruneCacheTask *const task = new QGCPruneCacheTask(amountToPrune);
+        (void)connect(task, &QGCPruneCacheTask::pruned, this,
+                       &QGCMapEngine::_pruned);
+        (void)addTask(task);
+    }
+}
+
+void QGCMapEngine::shutdown() {
+    if (!m_worker) {
+        return;
+    }
+    // 如果当前线程就是 worker 线程，直接调用以避免 BlockingQueuedConnection 引发死锁
+    if (QThread::currentThread() == m_worker) {
+        m_worker->stop();
+    } else {
+        QMetaObject::invokeMethod(m_worker, "stop");
+    }
+
+    // 等待线程结束（如果仍然在运行）
+    if (m_worker->isRunning()) {
+        m_worker->wait();
     }
 }

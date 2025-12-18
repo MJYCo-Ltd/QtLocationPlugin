@@ -94,6 +94,7 @@ private:
     int _updateTimeout = kShortTimeout;
     std::atomic_bool _failed = false;
     std::atomic_bool _valid = false;
+    std::atomic_bool _stop = false;
 
     static constexpr const char *kSession = "QGeoTileWorkerSession";
     static constexpr const char *kExportSession = "QGeoTileExportSession";

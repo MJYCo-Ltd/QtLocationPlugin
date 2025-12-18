@@ -34,6 +34,7 @@ QGCCacheWorker::~QGCCacheWorker()
 
 void QGCCacheWorker::stop()
 {
+    _stop = true;
     QMutexLocker lock(&_taskQueueMutex);
     qDeleteAll(_taskQueue);
     lock.unlock();
@@ -45,6 +46,8 @@ void QGCCacheWorker::stop()
 
 bool QGCCacheWorker::enqueueTask(QGCMapTask *task)
 {
+    if(_stop) return(false);
+
     if (!_valid && (task->type() != QGCMapTask::taskInit)) {
         task->setError(tr("Database Not Initialized"));
         task->deleteLater();
@@ -81,7 +84,7 @@ void QGCCacheWorker::run()
     }
 
     QMutexLocker lock(&_taskQueueMutex);
-    while (true) {
+    while (!_stop) {
         if (!_taskQueue.isEmpty()) {
             QGCMapTask* const task = _taskQueue.dequeue();
             lock.unlock();

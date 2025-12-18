@@ -46,6 +46,7 @@ signals:
 private slots:
     void _updateTotals(quint32 totaltiles, quint64 totalsize, quint32 defaulttiles, quint64 defaultsize);
     void _pruned() { m_prunning = false; }
+    void shutdown();
 
 private:
     QGCCacheWorker *m_worker = nullptr;
