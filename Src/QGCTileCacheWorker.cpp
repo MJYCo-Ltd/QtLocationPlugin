@@ -278,8 +278,6 @@ void QGCCacheWorker::_saveTile(QGCMapTask *mtask) {
             << "Map Cache SQL error (add tile into SetTiles):"
             << query.lastError().text();
     }
-
-    qCDebug(QGCTileCacheWorkerLog) << "HASH:" << task->tile()->hash();
 }
 
 void QGCCacheWorker::_getTile(QGCMapTask *mtask) {
