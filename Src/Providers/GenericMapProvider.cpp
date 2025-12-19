@@ -6,46 +6,43 @@
  * COPYING.md in the root of the source code directory.
  *
  ****************************************************************************/
-#include <QRegularExpression>
 #include "GenericMapProvider.h"
+#include <QRegularExpression>
 
-QString CyberJapanMapProvider::_getURL(int x, int y, int zoom) const
-{
+QString CyberJapanMapProvider::_getURL(int x, int y, int zoom) const {
     return _mapUrl.arg(_mapName).arg(zoom).arg(x).arg(y).arg(_imageFormat);
 }
 
-QString LINZBasemapMapProvider::_getURL(int x, int y, int zoom) const
-{
+QString LINZBasemapMapProvider::_getURL(int x, int y, int zoom) const {
     return _mapUrl.arg(zoom).arg(x).arg(y).arg(_imageFormat);
 }
 
-QString OpenStreetMapProvider::_getURL(int x, int y, int zoom) const
-{
+QString OpenStreetMapProvider::_getURL(int x, int y, int zoom) const {
     return _mapUrl.arg(zoom).arg(x).arg(y);
 }
 
-QString StatkartMapProvider::_getURL(int x, int y, int zoom) const
-{
+QString StatkartMapProvider::_getURL(int x, int y, int zoom) const {
     return _mapUrl.arg(zoom).arg(y).arg(x);
 }
 
-QString EniroMapProvider::_getURL(int x, int y, int zoom) const
-{
+QString EniroMapProvider::_getURL(int x, int y, int zoom) const {
     return _mapUrl.arg(zoom).arg(x).arg((1 << zoom) - 1 - y).arg(_imageFormat);
 }
 
-QString SvalbardMapProvider::_getURL(int x, int y, int zoom) const
-{
+QString SvalbardMapProvider::_getURL(int x, int y, int zoom) const {
     return _mapUrl.arg(zoom).arg(y).arg(x);
 }
 
-QString MapQuestMapProvider::_getURL(int x, int y, int zoom) const
-{
-    return _mapUrl.arg(_getServerNum(x, y, 4)).arg(_mapName).arg(zoom).arg(x).arg(y).arg(_imageFormat);
+QString MapQuestMapProvider::_getURL(int x, int y, int zoom) const {
+    return _mapUrl.arg(_getServerNum(x, y, 4))
+        .arg(_mapName)
+        .arg(zoom)
+        .arg(x)
+        .arg(y)
+        .arg(_imageFormat);
 }
 
-QString VWorldMapProvider::_getURL(int x, int y, int zoom) const
-{
+QString VWorldMapProvider::_getURL(int x, int y, int zoom) const {
     if ((zoom < 5) || (zoom > 19)) {
         return QString();
     }
@@ -65,5 +62,9 @@ QString VWorldMapProvider::_getURL(int x, int y, int zoom) const
     }
 
     const QString VWorldMapToken = "";
-    return _mapUrl.arg(VWorldMapToken, _mapName).arg(zoom).arg(y).arg(x).arg(_imageFormat);
+    return _mapUrl.arg(VWorldMapToken, _mapName)
+        .arg(zoom)
+        .arg(y)
+        .arg(x)
+        .arg(_imageFormat);
 }

@@ -26,7 +26,6 @@ bool QGeoFileTileCacheQGC::_cacheWasReset = false;
 QGeoFileTileCacheQGC::QGeoFileTileCacheQGC(const QVariantMap &parameters,
                                            QObject *parent)
     : QGeoFileTileCache(baseCacheDirectory(), parent) {
-    // qCDebug(QGeoFileTileCacheQGCLog) << Q_FUNC_INFO << this;
 
     setCostStrategyDisk(QGeoFileTileCache::ByteSize);
     setMaxDiskUsage(_getDefaultMaxDiskCache());

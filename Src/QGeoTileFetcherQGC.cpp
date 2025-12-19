@@ -8,41 +8,41 @@
  ****************************************************************************/
 
 #include "QGeoTileFetcherQGC.h"
-#include "QGeoTiledMappingManagerEngineQGC.h"
-#include "QGeoMapReplyQGC.h"
-#include "QGCMapUrlEngine.h"
 #include "MapProvider.h"
+#include "QGCMapUrlEngine.h"
+#include "QGeoMapReplyQGC.h"
+#include "QGeoTiledMappingManagerEngineQGC.h"
 
-
-#include <QtNetwork/QNetworkRequest>
 #include <QtLocation/private/qgeotiledmappingmanagerengine_p.h>
 #include <QtLocation/private/qgeotilespec_p.h>
+#include <QtNetwork/QNetworkRequest>
 
-Q_LOGGING_CATEGORY(QGeoTileFetcherQGCLog, "qgc.qtlocationplugin.qgeotilefetcherqgc")
+Q_LOGGING_CATEGORY(QGeoTileFetcherQGCLog,
+                   "qgc.qtlocationplugin.qgeotilefetcherqgc")
 
-QGeoTileFetcherQGC::QGeoTileFetcherQGC(QNetworkAccessManager *networkManager, const QVariantMap &parameters, QGeoTiledMappingManagerEngineQGC *parent)
-    : QGeoTileFetcher(parent)
-    , m_networkManager(networkManager)
-{
+QGeoTileFetcherQGC::QGeoTileFetcherQGC(QNetworkAccessManager *networkManager,
+                                       const QVariantMap &parameters,
+                                       QGeoTiledMappingManagerEngineQGC *parent)
+    : QGeoTileFetcher(parent), m_networkManager(networkManager) {
     Q_CHECK_PTR(networkManager);
 }
 
-QGeoTileFetcherQGC::~QGeoTileFetcherQGC()
-{
-}
+QGeoTileFetcherQGC::~QGeoTileFetcherQGC() {}
 
-QGeoTiledMapReply* QGeoTileFetcherQGC::getTileImage(const QGeoTileSpec &spec)
-{
-    const SharedMapProvider provider = UrlFactory::getMapProviderFromQtMapId(spec.mapId());
+QGeoTiledMapReply *QGeoTileFetcherQGC::getTileImage(const QGeoTileSpec &spec) {
+    const SharedMapProvider provider =
+        UrlFactory::getMapProviderFromQtMapId(spec.mapId());
     if (!provider) {
         return nullptr;
     }
 
-    if (spec.zoom() > provider->maximumZoomLevel() || spec.zoom() < provider->minimumZoomLevel()) {
+    if (spec.zoom() > provider->maximumZoomLevel() ||
+        spec.zoom() < provider->minimumZoomLevel()) {
         return nullptr;
     }
 
-    const QNetworkRequest request = getNetworkRequest(spec.mapId(), spec.x(), spec.y(), spec.zoom());
+    const QNetworkRequest request =
+        getNetworkRequest(spec.mapId(), spec.x(), spec.y(), spec.zoom());
     if (request.url().isEmpty()) {
         return nullptr;
     }
@@ -50,23 +50,18 @@ QGeoTiledMapReply* QGeoTileFetcherQGC::getTileImage(const QGeoTileSpec &spec)
     return new QGeoTiledMapReplyQGC(m_networkManager, request, spec);
 }
 
-bool QGeoTileFetcherQGC::initialized() const
-{
+bool QGeoTileFetcherQGC::initialized() const {
     return (m_networkManager != nullptr);
 }
 
-bool QGeoTileFetcherQGC::fetchingEnabled() const
-{
-    return initialized();
-}
+bool QGeoTileFetcherQGC::fetchingEnabled() const { return initialized(); }
 
-void QGeoTileFetcherQGC::timerEvent(QTimerEvent *event)
-{
+void QGeoTileFetcherQGC::timerEvent(QTimerEvent *event) {
     QGeoTileFetcher::timerEvent(event);
 }
 
-void QGeoTileFetcherQGC::handleReply(QGeoTiledMapReply *reply, const QGeoTileSpec &spec)
-{
+void QGeoTileFetcherQGC::handleReply(QGeoTiledMapReply *reply,
+                                     const QGeoTileSpec &spec) {
     if (!reply) {
         return;
     }
@@ -84,9 +79,10 @@ void QGeoTileFetcherQGC::handleReply(QGeoTiledMapReply *reply, const QGeoTileSpe
     }
 }
 
-QNetworkRequest QGeoTileFetcherQGC::getNetworkRequest(int mapId, int x, int y, int zoom)
-{
-    const SharedMapProvider mapProvider = UrlFactory::getMapProviderFromQtMapId(mapId);
+QNetworkRequest QGeoTileFetcherQGC::getNetworkRequest(int mapId, int x, int y,
+                                                      int zoom) {
+    const SharedMapProvider mapProvider =
+        UrlFactory::getMapProviderFromQtMapId(mapId);
 
     QNetworkRequest request;
     request.setUrl(mapProvider->getTileURL(x, y, zoom));
@@ -101,11 +97,13 @@ QNetworkRequest QGeoTileFetcherQGC::getNetworkRequest(int mapId, int x, int y, i
         request.setRawHeader(QByteArrayLiteral("User-Token"), token);
     }
     // request.setOriginatingObject(this);
-    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::PreferCache);
+    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
+                         QNetworkRequest::PreferCache);
     request.setAttribute(QNetworkRequest::BackgroundRequestAttribute, true);
     request.setAttribute(QNetworkRequest::CacheSaveControlAttribute, true);
     request.setAttribute(QNetworkRequest::DoNotBufferUploadDataAttribute, false);
-    // request.setAttribute(QNetworkRequest::AutoDeleteReplyOnFinishAttribute, true);
+    // request.setAttribute(QNetworkRequest::AutoDeleteReplyOnFinishAttribute,
+    // true);
     request.setPriority(QNetworkRequest::NormalPriority);
     request.setTransferTimeout(10000);
 

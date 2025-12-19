@@ -38,7 +38,6 @@ QGCMapEngine *getQGCMapEngine() { return QGCMapEngine::instance(); }
 
 QGCMapEngine::QGCMapEngine(QObject *parent)
     : QObject(parent), m_worker(new QGCCacheWorker(this)) {
-    // qCDebug(QGCMapEngineLog) << Q_FUNC_INFO << this;
 
     (void)qRegisterMetaType<QGCMapTask::TaskType>("TaskType");
     (void)qRegisterMetaType<QGCTile>("QGCTile");

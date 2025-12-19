@@ -9,18 +9,26 @@
 
 #include "MapboxMapProvider.h"
 
-QString MapboxMapProvider::_getURL(int x, int y, int zoom) const
-{
+QString MapboxMapProvider::_getURL(int x, int y, int zoom) const {
     const QString mapBoxToken = "";
     if (!mapBoxToken.isEmpty()) {
         if (_mapTypeId == QStringLiteral("mapbox.custom")) {
-            static const QString MapBoxUrlCustom = QStringLiteral("https://api.mapbox.com/styles/v1/%1/%2/tiles/256/%3/%4/%5?access_token=%6");
+            static const QString MapBoxUrlCustom =
+                QStringLiteral("https://api.mapbox.com/styles/v1/%1/%2/tiles/256/%3/"
+                               "%4/%5?access_token=%6");
             const QString mapBoxAccount = "";
             const QString mapBoxStyle = "";
-            return MapBoxUrlCustom.arg(mapBoxAccount).arg(mapBoxStyle).arg(zoom).arg(x).arg(y).arg(mapBoxToken);
+            return MapBoxUrlCustom.arg(mapBoxAccount)
+                .arg(mapBoxStyle)
+                .arg(zoom)
+                .arg(x)
+                .arg(y)
+                .arg(mapBoxToken);
         }
 
-        static const QString MapBoxUrl = QStringLiteral("https://api.mapbox.com/styles/v1/mapbox/%1/tiles/%2/%3/%4?access_token=%5");
+        static const QString MapBoxUrl =
+            QStringLiteral("https://api.mapbox.com/styles/v1/mapbox/%1/tiles/%2/%3/"
+                           "%4?access_token=%5");
         return MapBoxUrl.arg(_mapTypeId).arg(zoom).arg(x).arg(y).arg(mapBoxToken);
     }
     return QString();
