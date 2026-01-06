@@ -105,6 +105,33 @@ QGCFetchTileTask *QGeoFileTileCacheQGC::createFetchTileTask(const QString &type,
     return task;
 }
 
+void QGeoFileTileCacheQGC::cacheCompositeTile(const QString &layerStackKey, int x, int y, int z,
+                                               const QByteArray &image, const QString &format) {
+    // 生成合成瓦片的哈希键
+    // 格式: "composite_{layerStackKey}_{x}_{y}_{z}"
+    QString hash = QString("composite_%1_%2_%3_%4")
+                    .arg(layerStackKey)
+                    .arg(x, 8, 10, QChar('0'))
+                    .arg(y, 8, 10, QChar('0'))
+                    .arg(z, 3, 10, QChar('0'));
+    
+    // 使用特殊的类型标识符 "Composite"
+    cacheTile("Composite", hash, image, format, UINT64_MAX);
+}
+
+QGCFetchTileTask *QGeoFileTileCacheQGC::createFetchCompositeTileTask(const QString &layerStackKey, 
+                                                                      int x, int y, int z) {
+    // 生成合成瓦片的哈希键（与 cacheCompositeTile 保持一致）
+    QString hash = QString("composite_%1_%2_%3_%4")
+                    .arg(layerStackKey)
+                    .arg(x, 8, 10, QChar('0'))
+                    .arg(y, 8, 10, QChar('0'))
+                    .arg(z, 3, 10, QChar('0'));
+    
+    QGCFetchTileTask *const task = new QGCFetchTileTask(hash);
+    return task;
+}
+
 QString QGeoFileTileCacheQGC::_getCachePath(const QVariantMap &parameters) {
     QString cacheDir;
     if (parameters.contains(QStringLiteral("mapping.cache.directory"))) {

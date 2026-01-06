@@ -18,7 +18,7 @@ private:
 
     const QString _type;
     const QString _mapUrl =
-        QStringLiteral("http://t%1.tianditu.gov.cn/%2_w/"
+        QStringLiteral("https://t%1.tianditu.gov.cn/%2_w/"
                                            "wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER="
                                            "%2&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&"
                                            "TILEMATRIX=%3&TILEROW=%4&TILECOL=%5&tk=%6");

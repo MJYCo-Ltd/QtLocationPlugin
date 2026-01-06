@@ -59,6 +59,9 @@ QGeoTiledMappingManagerEngineQGC::QGeoTiledMappingManagerEngineQGC(const QVarian
         TiandiMapProvider::_key = parameters[QStringLiteral("TiandiTuKey")].toString();
     }
 
+    // 解析图层配置
+    parseLayerConfiguration(parameters);
+
     QList<QGeoMapType> mapList;
     const QList<SharedMapProvider> providers = UrlFactory::getProviders();
     for (const SharedMapProvider &provider : providers) {
@@ -125,4 +128,45 @@ QGeoMap *QGeoTiledMappingManagerEngineQGC::createMap()
     QGeoTiledMapQGC* const map = new QGeoTiledMapQGC(this, this);
     map->setPrefetchStyle(m_prefetchStyle);
     return map;
+}
+
+void QGeoTiledMappingManagerEngineQGC::parseLayerConfiguration(const QVariantMap &parameters)
+{
+    // 从参数解析图层配置
+    m_layerStack = MapLayerStack::fromParameters(parameters);
+
+    if (m_layerStack.isEmpty()) {
+        qCDebug(QGeoTiledMappingManagerEngineQGCLog) << "Multi-layer not enabled or no layers configured";
+        return;
+    }
+
+    qCDebug(QGeoTiledMappingManagerEngineQGCLog) 
+        << "Multi-layer enabled with" << m_layerStack.count() << "layers";
+
+    // 在多图层模式下，为所有支持的 mapId 创建映射
+    // 这样无论用户选择哪个 activeMapType，都会使用相同的图层配置
+    // 确保切换 activeMapType 时地图显示不变
+    const QList<SharedMapProvider> providers = UrlFactory::getProviders();
+    for (const SharedMapProvider &provider : providers) {
+        m_mapIdToLayerStack.insert(provider->getMapId(), m_layerStack);
+    }
+    
+    qCDebug(QGeoTiledMappingManagerEngineQGCLog) 
+        << "Multi-layer configuration applied to all" << m_mapIdToLayerStack.count() << "map types";
+}
+
+MapLayerStack QGeoTiledMappingManagerEngineQGC::getLayerStackForMapId(int mapId) const
+{
+    // 如果启用了多图层模式，忽略 mapId 的变化，始终返回全局图层配置
+    // 这样切换 activeMapType 时，地图显示不会改变
+    if (!m_layerStack.isEmpty()) {
+        return m_layerStack;
+    }
+
+    // 单图层模式下，检查是否有特定映射
+    if (m_mapIdToLayerStack.contains(mapId)) {
+        return m_mapIdToLayerStack.value(mapId);
+    }
+
+    return MapLayerStack();
 }

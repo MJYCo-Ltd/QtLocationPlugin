@@ -12,11 +12,13 @@
 #include <QtLocation/private/qgeotilefetcher_p.h>
 #include <QtCore/QLoggingCategory>
 #include <QtNetwork/QNetworkRequest>
+#include "QGCMapLayerConfig.h"
 
 Q_DECLARE_LOGGING_CATEGORY(QGeoTileFetcherQGCLog)
 
 class QGeoTiledMappingManagerEngineQGC;
 class QGeoTiledMapReplyQGC;
+class QGeoMultiLayerMapReplyQGC;
 class QGeoTileSpec;
 class QNetworkAccessManager;
 
@@ -40,7 +42,12 @@ private:
     void timerEvent(QTimerEvent *event) final;
     void handleReply(QGeoTiledMapReply *reply, const QGeoTileSpec &spec) final;
 
+    // 多图层支持
+    QGeoTiledMapReply* getMultiLayerTileImage(const QGeoTileSpec &spec, const MapLayerStack &layerStack);
+    MapLayerStack getLayerStackForMapId(int mapId) const;
+
     QNetworkAccessManager *m_networkManager = nullptr;
+    QGeoTiledMappingManagerEngineQGC *m_engine = nullptr;
 
 #if defined Q_OS_MACOS
     static constexpr const char* s_userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.5; rv:125.0) Gecko/20100101 Firefox/125.0";

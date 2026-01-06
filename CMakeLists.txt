@@ -28,10 +28,13 @@ set(SOURCES
     Src/QGCFileDownload.cc
     Src/QGCMapEngine.cpp
     Src/QGCMapEngineManager.cc
+    Src/QGCMapLayerConfig.cpp
     Src/QGCMapUrlEngine.cpp
     Src/QGCTileCacheWorker.cpp
+    Src/QGCTileCompositor.cpp
     Src/QGeoFileTileCacheQGC.cpp
     Src/QGeoMapReplyQGC.cpp
+    Src/QGeoMultiLayerMapReplyQGC.cpp
     Src/QGeoServiceProviderPluginQGC.cpp
     Src/QGeoTiledMappingManagerEngineQGC.cpp
     Src/QGeoTiledMapQGC.cpp
@@ -55,13 +58,16 @@ set(HEADERS
     Inc/QGCFileDownload.h
     Inc/QGCMapEngine.h
     Inc/QGCMapEngineManager.h
+    Inc/QGCMapLayerConfig.h
     Inc/QGCMapTasks.h
     Inc/QGCMapUrlEngine.h
     Inc/QGCTile.h
     Inc/QGCTileCacheWorker.h
+    Inc/QGCTileCompositor.h
     Inc/QGCTileSet.h
     Inc/QGeoFileTileCacheQGC.h
     Inc/QGeoMapReplyQGC.h
+    Inc/QGeoMultiLayerMapReplyQGC.h
     Inc/QGeoServiceProviderPluginQGC.h
     Inc/QGeoTiledMappingManagerEngineQGC.h
     Inc/QGeoTiledMapQGC.h

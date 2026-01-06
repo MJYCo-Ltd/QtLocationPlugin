@@ -30,6 +30,11 @@ public:
     static QGCFetchTileTask *createFetchTileTask(const QString &type, int x, int y, int z);
     static QString getDatabaseFilePath() { return _databaseFilePath; }
     static QString getCachePath() { return _cachePath; }
+    
+    // 多图层缓存支持
+    static void cacheCompositeTile(const QString &layerStackKey, int x, int y, int z, 
+                                    const QByteArray &image, const QString &format);
+    static QGCFetchTileTask *createFetchCompositeTileTask(const QString &layerStackKey, int x, int y, int z);
 
 private:
     // QString tileSpecToFilename(const QGeoTileSpec &spec, const QString &format, const QString &directory) const final;
