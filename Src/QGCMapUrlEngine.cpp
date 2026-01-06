@@ -78,8 +78,12 @@ const QList<SharedMapProvider> UrlFactory::_providers = {
     std::make_shared<OpenStreetMapProvider>(),
 
     std::make_shared<TiandiSatelliteMapProvider>(),
+    std::make_shared<TiandiSatelliteMapNoteProvider>(),
     std::make_shared<TiandiStreetMapProvider>(),
+    std::make_shared<TiandiStreetMapNoteProvider>(),
     std::make_shared<TiandiTerrainMapProvider>(),
+    std::make_shared<TiandiTerrainMapNoteProvider>(),
+    std::make_shared<TiandiBorderProvider>(),
     std::make_shared<TmsMapProvider>(),
 
     std::make_shared<CopernicusElevationProvider>()};

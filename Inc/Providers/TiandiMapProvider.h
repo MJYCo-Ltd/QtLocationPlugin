@@ -18,30 +18,58 @@ private:
 
     const QString _type;
     const QString _mapUrl =
-        QStringLiteral("http://t%1.tianditu.gov.cn/%2/"
+        QStringLiteral("http://t%1.tianditu.gov.cn/%2_w/"
                                            "wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER="
-                                           "img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&"
+                                           "%2&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&"
                                            "TILEMATRIX=%3&TILEROW=%4&TILECOL=%5&tk=%6");
 };
 
 class TiandiStreetMapProvider : public TiandiMapProvider {
 public:
     TiandiStreetMapProvider()
-        : TiandiMapProvider(QStringLiteral("天地图街道"),"vec_w",
+        : TiandiMapProvider(QStringLiteral("天地图街道"),"vec",
                            QGeoMapType::StreetMap) {}
+};
+
+class TiandiStreetMapNoteProvider : public TiandiMapProvider {
+public:
+    TiandiStreetMapNoteProvider()
+        : TiandiMapProvider(QStringLiteral("天地图街道注记"),"cva",
+                            QGeoMapType::StreetMap) {}
 };
 
 class TiandiSatelliteMapProvider : public TiandiMapProvider {
 public:
     TiandiSatelliteMapProvider()
-        : TiandiMapProvider(QStringLiteral("天地图卫星"), "img_w",
+        : TiandiMapProvider(QStringLiteral("天地图卫星"), "img",
                            QGeoMapType::SatelliteMapDay) {}
+};
+
+class TiandiSatelliteMapNoteProvider : public TiandiMapProvider {
+public:
+    TiandiSatelliteMapNoteProvider()
+        : TiandiMapProvider(QStringLiteral("天地图卫星注记"), "cia",
+                            QGeoMapType::SatelliteMapDay) {}
 };
 
 class TiandiTerrainMapProvider : public TiandiMapProvider {
 public:
     TiandiTerrainMapProvider()
-        : TiandiMapProvider(QStringLiteral("天地图高程"), "ter_w",
+        : TiandiMapProvider(QStringLiteral("天地图高程"), "ter",
+                            QGeoMapType::TerrainMap) {}
+};
+
+class TiandiTerrainMapNoteProvider : public TiandiMapProvider {
+public:
+    TiandiTerrainMapNoteProvider()
+        : TiandiMapProvider(QStringLiteral("天地图高程注记"), "cta",
+                            QGeoMapType::TerrainMap) {}
+};
+
+class TiandiBorderProvider : public TiandiMapProvider {
+public:
+    TiandiBorderProvider()
+        : TiandiMapProvider(QStringLiteral("天地图边界"), "ibo",
                             QGeoMapType::TerrainMap) {}
 };
 #endif // TIANDIMAPPROVIDER_H
