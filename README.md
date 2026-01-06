@@ -36,6 +36,7 @@ Map {
         }
 }
 ```
+[多图层支持](./MULTI_LAYER_USAGE.md)
 > [!WARNING] 
 > 使用此代码务必遵循以下许可
 >
