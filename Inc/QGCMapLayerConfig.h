@@ -81,6 +81,10 @@ public:
 
     // 生成缓存键的哈希值
     QString generateCacheKey() const;
+    
+    // 生成唯一的 mapId（基于图层配置：图层ID、顺序、透明度）
+    // 返回值范围：10000-99999（避免与普通地图类型的 mapId 冲突）
+    int generateMapId() const;
 
     // 从参数解析
     static MapLayerStack fromParameters(const QVariantMap &parameters);

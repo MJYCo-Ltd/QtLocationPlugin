@@ -34,6 +34,7 @@ public:
     QGeoMultiLayerMapReplyQGC(QNetworkAccessManager *networkManager, 
                                const QGeoTileSpec &spec,
                                const MapLayerStack &layerStack,
+                               int compositeMapId = -1,
                                QObject *parent = nullptr);
     ~QGeoMultiLayerMapReplyQGC();
 
@@ -57,6 +58,7 @@ private:
 
     MapLayerStack _layerStack;
     QList<MapLayer> _visibleLayers;
+    int _compositeMapId = -1;  // 多图层合成瓦片的 mapId（用于文件保存）
     
     // 存储每个图层的网络回复
     QHash<int, QNetworkReply*> _replies;

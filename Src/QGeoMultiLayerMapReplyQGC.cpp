@@ -20,6 +20,7 @@
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QSslError>
 #include <QtCore/QFile>
+#include <QtCore/QDir>
 
 Q_LOGGING_CATEGORY(QGeoMultiLayerMapReplyQGCLog,
                    "qgc.qtlocationplugin.qgeomultilayermapreplyqgc")
@@ -28,10 +29,12 @@ QGeoMultiLayerMapReplyQGC::QGeoMultiLayerMapReplyQGC(
     QNetworkAccessManager *networkManager,
     const QGeoTileSpec &spec,
     const MapLayerStack &layerStack,
+    int compositeMapId,
     QObject *parent)
     // 使用延迟初始化构造函数，避免父类自动从缓存获取
     : QGeoTiledMapReplyQGC(networkManager, spec, parent)
     , _layerStack(layerStack)
+    , _compositeMapId(compositeMapId > 0 ? compositeMapId : layerStack.generateMapId())
 {
     // 过滤可见图层
     QList<MapLayer> allLayers = _layerStack.layers();
@@ -81,7 +84,46 @@ void QGeoMultiLayerMapReplyQGC::_startFetching() {
 
     _pendingReplies = 0;
 
-    // 首先尝试从合成瓦片缓存获取（即使只有一个图层，如果之前缓存过 composite 瓦片也应该尝试）
+    // 首先尝试从文件系统（providers 文件夹）检查合成瓦片缓存
+    // 文件名格式: "{compositeMapId}-{zoom}-{x}-{y}.{format}"
+    if (_compositeMapId > 0) {
+        QString cachePath = QGeoFileTileCacheQGC::getCachePath() + QLatin1String("/providers");
+        // 尝试常见的图片格式
+        QStringList formats = {"png", "jpg", "jpeg"};
+        for (const QString &format : formats) {
+            QString filename = QString("%1-%2-%3-%4.%5")
+                              .arg(_compositeMapId)
+                              .arg(zoom)
+                              .arg(x)
+                              .arg(y)
+                              .arg(format);
+            QString filePath = cachePath + "/" + filename;
+            
+            QFile file(filePath);
+            if (file.exists() && file.open(QIODevice::ReadOnly)) {
+                QByteArray imageData = file.readAll();
+                file.close();
+                
+                if (!imageData.isEmpty()) {
+                    // 从文件系统读取成功，设置数据并完成
+                    setMapImageData(imageData);
+                    setMapImageFormat(format);
+                    setCached(true);
+                    setFinished(true);
+                    
+                    // 同时更新数据库缓存（异步，不阻塞）
+                    QString layerStackKey = _layerStack.generateCacheKey();
+                    if (!layerStackKey.isEmpty()) {
+                        QGeoFileTileCacheQGC::cacheCompositeTile(layerStackKey, x, y, zoom,
+                                                                  imageData, format);
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    // 文件系统未命中，尝试从数据库获取合成瓦片缓存
     QString layerStackKey = _layerStack.generateCacheKey();
     if (!layerStackKey.isEmpty()) {
         QGCFetchTileTask *compositeTask = QGeoFileTileCacheQGC::createFetchCompositeTileTask(
@@ -443,12 +485,36 @@ void QGeoMultiLayerMapReplyQGC::_compositeTiles() {
     setMapImageFormat(compositeResult.format);
     setCached(false);
 
-    // 缓存合成后的瓦片
+    // 缓存合成后的瓦片（数据库）
     const QGeoTileSpec &spec = tileSpec();
     QString cacheKey = _layerStack.generateCacheKey();
     if (!cacheKey.isEmpty()) {
         QGeoFileTileCacheQGC::cacheCompositeTile(cacheKey, spec.x(), spec.y(), spec.zoom(),
                                                   compositeResult.imageData, compositeResult.format);
+    }
+
+    // 保存到文件系统（使用 compositeMapId 作为文件名的一部分）
+    // 文件名格式: "{compositeMapId}-{zoom}-{x}-{y}.{format}"
+    if (_compositeMapId > 0) {
+        QString cachePath = QGeoFileTileCacheQGC::getCachePath() + QLatin1String("/providers");
+        QDir cacheDir;
+        if (cacheDir.mkpath(cachePath)) {
+            QString filename = QString("%1-%2-%3-%4.%5")
+                              .arg(_compositeMapId)
+                              .arg(spec.zoom())
+                              .arg(spec.x())
+                              .arg(spec.y())
+                              .arg(compositeResult.format);
+            QString filePath = cachePath + "/" + filename;
+            
+            QFile file(filePath);
+            if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+                file.write(compositeResult.imageData);
+                file.close();
+            } else {
+                qCWarning(QGeoMultiLayerMapReplyQGCLog) << "Failed to save composite tile to file:" << filePath << file.errorString();
+            }
+        }
     }
 
     setFinished(true);

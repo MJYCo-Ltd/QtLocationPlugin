@@ -136,7 +136,48 @@ void QGeoTiledMappingManagerEngineQGC::parseLayerConfiguration(const QVariantMap
     m_layerStack = MapLayerStack::fromParameters(parameters);
 
     if (m_layerStack.isEmpty()) {
+        m_compositeMapId = -1;
         return;
+    }
+
+    // 为多图层配置生成唯一的 mapId（基于图层、顺序、透明度）
+    m_compositeMapId = m_layerStack.generateMapId();
+    
+    // 将多图层 mapId 注册到支持的地图类型列表中
+    // 这样 Qt Location 可以识别这个 mapId，并自动保存文件
+    QList<QGeoMapType> mapList = supportedMapTypes();
+    
+    // 检查是否已经注册过（避免重复添加）
+    bool alreadyRegistered = false;
+    for (const QGeoMapType &mapType : mapList) {
+        if (mapType.mapId() == m_compositeMapId) {
+            alreadyRegistered = true;
+            break;
+        }
+    }
+    
+    if (!alreadyRegistered && m_compositeMapId > 0) {
+        // 创建多图层合成地图类型
+        QVariantMap variantMap;
+        variantMap.insert("minimumZoomLevel", 1);
+        variantMap.insert("maximumZoomLevel", 21);
+        variantMap.insert("isComposite", true);
+        variantMap.insert("layerStackKey", m_layerStack.generateCacheKey());
+        
+        QString compositeName = QString("Composite_%1").arg(m_layerStack.generateCacheKey());
+        const QGeoMapType compositeMap = QGeoMapType(
+            QGeoMapType::CustomMap,
+            compositeName,
+            compositeName,
+            false,
+            false,
+            m_compositeMapId,
+            QByteArrayLiteral("QGroundControl"),
+            cameraCapabilities(),
+            variantMap
+        );
+        mapList.append(compositeMap);
+        setSupportedMapTypes(mapList);
     }
 
     // 在多图层模式下，为所有支持的 mapId 创建映射

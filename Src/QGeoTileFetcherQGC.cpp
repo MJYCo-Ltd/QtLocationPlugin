@@ -185,5 +185,19 @@ QGeoTiledMapReply *QGeoTileFetcherQGC::getMultiLayerTileImage(const QGeoTileSpec
         return new QGeoTiledMapReplyQGC(m_networkManager, request, spec);
     }
     
-    return new QGeoMultiLayerMapReplyQGC(m_networkManager, spec, layerStack);
+    // 多图层模式：获取生成的 mapId（用于文件保存）
+    // 注意：我们仍然使用原始的 spec，但会在 QGeoMultiLayerMapReplyQGC 中
+    // 使用 compositeMapId 来保存文件
+    int compositeMapId = -1;
+    if (m_engine) {
+        compositeMapId = m_engine->getCompositeMapId();
+    }
+    
+    // 如果无法获取 compositeMapId，使用图层栈生成的 mapId
+    if (compositeMapId <= 0) {
+        compositeMapId = layerStack.generateMapId();
+    }
+    
+    // 直接使用原始的 spec，compositeMapId 会在 QGeoMultiLayerMapReplyQGC 中使用
+    return new QGeoMultiLayerMapReplyQGC(m_networkManager, spec, layerStack, compositeMapId);
 }

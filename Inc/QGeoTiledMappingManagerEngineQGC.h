@@ -33,6 +33,7 @@ public:
     const MapLayerStack& layerStack() const { return m_layerStack; }
     bool isMultiLayerEnabled() const { return !m_layerStack.isEmpty(); }
     MapLayerStack getLayerStackForMapId(int mapId) const;
+    int getCompositeMapId() const { return m_compositeMapId; }
 
 private:
     void parseLayerConfiguration(const QVariantMap &parameters);
@@ -40,6 +41,7 @@ private:
     QNetworkAccessManager *m_networkManager = nullptr;
     MapLayerStack m_layerStack;  // 全局图层配置
     QHash<int, MapLayerStack> m_mapIdToLayerStack;  // mapId 到图层配置的映射
+    int m_compositeMapId = -1;  // 多图层合成瓦片的 mapId
 
     static constexpr int kTileVersion = 1;
 };

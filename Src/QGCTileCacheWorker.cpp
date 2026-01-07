@@ -50,9 +50,23 @@ bool QGCCacheWorker::enqueueTask(QGCMapTask *task) {
 
     QMutexLocker lock(&_taskQueueMutex);
     
-    // 对于获取瓦片的任务（taskFetchTile），使用 LIFO（后进先出）优先处理最新请求
-    // 其他任务使用 FIFO（先进先出）保持原有顺序
+    // 对于获取瓦片的任务（taskFetchTile），检查是否已存在相同 hash 的任务
+    // 如果存在，移除旧任务（避免重复查询），添加新任务（确保最新的信号连接）
     if (task->type() == QGCMapTask::taskFetchTile) {
+        QGCFetchTileTask *fetchTask = qobject_cast<QGCFetchTileTask *>(task);
+        if (fetchTask) {
+            QString newHash = fetchTask->hash();
+            // 查找并移除队列中相同 hash 的旧任务
+            for (auto it = _taskQueue.begin(); it != _taskQueue.end(); ++it) {
+                QGCFetchTileTask *existingTask = qobject_cast<QGCFetchTileTask *>(*it);
+                if (existingTask && existingTask->hash() == newHash) {
+                    // 移除旧任务（会被 deleteLater 删除）
+                    _taskQueue.erase(it);
+                    existingTask->deleteLater();
+                    break;
+                }
+            }
+        }
         // 将新任务插入到队列前面，优先处理最新的请求
         _taskQueue.prepend(task);
     } else {
@@ -256,7 +270,9 @@ void QGCCacheWorker::_saveTile(QGCMapTask *mtask) {
 
     QGCSaveTileTask *task = static_cast<QGCSaveTileTask *>(mtask);
     QSqlQuery query(*_db);
-    (void)query.prepare("INSERT INTO Tiles(hash, format, tile, size, type, date) "
+    // 使用 INSERT OR IGNORE 避免 UNIQUE constraint 错误
+    // 如果 hash 已存在，则忽略插入（不更新现有记录）
+    (void)query.prepare("INSERT OR IGNORE INTO Tiles(hash, format, tile, size, type, date) "
                          "VALUES(?, ?, ?, ?, ?, ?)");
     query.addBindValue(task->tile()->hash());
     query.addBindValue(task->tile()->format());
@@ -268,9 +284,33 @@ void QGCCacheWorker::_saveTile(QGCMapTask *mtask) {
         qCWarning(QGCTileCacheWorkerLog)
             << "Map Cache SQL error (add data into Tiles):"
             << query.lastError().text();
-        // Tile was already there.
-        // QtLocation some times requests the same tile twice in a row. The first is
-        // saved, the second is already there.
+        return;
+    }
+    
+    // 检查是否实际插入了新行（affectedRows() > 0 表示插入了新行）
+    // 如果 hash 已存在，affectedRows() 为 0，不需要添加到 SetTiles
+    if (query.numRowsAffected() == 0) {
+        // 瓦片已存在，尝试获取现有的 tileID
+        QSqlQuery findQuery(*_db);
+        findQuery.prepare("SELECT tileID FROM Tiles WHERE hash = ?");
+        findQuery.addBindValue(task->tile()->hash());
+        if (findQuery.exec() && findQuery.next()) {
+            const quint64 tileID = findQuery.value(0).toULongLong();
+            const quint64 setID = task->tile()->tileSet() == UINT64_MAX
+                                      ? _getDefaultTileSet()
+                                      : task->tile()->tileSet();
+            // 使用 INSERT OR IGNORE 避免 SetTiles 重复
+            const QString s =
+                QStringLiteral("INSERT OR IGNORE INTO SetTiles(tileID, setID) VALUES(%1, %2)")
+                              .arg(tileID)
+                              .arg(setID);
+            (void)query.prepare(s);
+            if (!query.exec()) {
+                qCWarning(QGCTileCacheWorkerLog)
+                    << "Map Cache SQL error (add tile into SetTiles):"
+                    << query.lastError().text();
+            }
+        }
         return;
     }
 

@@ -73,6 +73,31 @@ QString MapLayerStack::generateCacheKey() const {
     return parts.join("_");
 }
 
+int MapLayerStack::generateMapId() const {
+    if (m_layers.isEmpty()) {
+        return -1;
+    }
+    
+    // 基于图层配置生成哈希值
+    // 考虑因素：图层ID、zOrder（顺序）、opacity（透明度）、visible（可见性）
+    uint hash = 0;
+    for (const MapLayer &layer : m_layers) {
+        // 使用图层的关键属性生成哈希
+        hash ^= qHash(layer.mapId());
+        hash ^= qHash(layer.zOrder());
+        hash ^= qHash(layer.opacity());
+        hash ^= qHash(layer.visible());
+        // 旋转哈希值以增加随机性
+        hash = (hash << 1) | (hash >> 31);
+    }
+    
+    // 将哈希值映射到 10000-99999 范围（避免与普通地图类型的 mapId 冲突）
+    // 普通地图类型的 mapId 通常从 1 开始，最大约 100
+    int mapId = 10000 + (hash % 90000);
+    
+    return mapId;
+}
+
 MapLayerStack MapLayerStack::fromParameters(const QVariantMap &parameters) {
     MapLayerStack stack;
 
