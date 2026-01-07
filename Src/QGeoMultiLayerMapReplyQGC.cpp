@@ -14,6 +14,7 @@
 #include "QGeoFileTileCacheQGC.h"
 #include "QGCMapEngine.h"
 #include "QGCFileDownload.h"
+#include "QGeoTileFetcherQGC.h"
 
 #include <QtLocation/private/qgeotilespec_p.h>
 #include <QtNetwork/QNetworkAccessManager>
@@ -23,20 +24,15 @@
 Q_LOGGING_CATEGORY(QGeoMultiLayerMapReplyQGCLog,
                    "qgc.qtlocationplugin.qgeomultilayermapreplyqgc")
 
-QByteArray QGeoMultiLayerMapReplyQGC::_bingNoTileImage;
-QByteArray QGeoMultiLayerMapReplyQGC::_badTile;
-
 QGeoMultiLayerMapReplyQGC::QGeoMultiLayerMapReplyQGC(
     QNetworkAccessManager *networkManager,
     const QGeoTileSpec &spec,
     const MapLayerStack &layerStack,
     QObject *parent)
-    : QGeoTiledMapReply(spec, parent)
-    , _networkManager(networkManager)
+    // 使用延迟初始化构造函数，避免父类自动从缓存获取
+    : QGeoTiledMapReplyQGC(networkManager, spec, parent)
     , _layerStack(layerStack)
 {
-    _initDataFromResources();
-
     // 过滤可见图层
     QList<MapLayer> allLayers = _layerStack.layers();
     for (const MapLayer &layer : allLayers) {
@@ -50,17 +46,6 @@ QGeoMultiLayerMapReplyQGC::QGeoMultiLayerMapReplyQGC(
         setFinished(true);
         return;
     }
-
-    // 连接错误处理
-    (void)connect(
-        this, &QGeoMultiLayerMapReplyQGC::errorOccurred, this,
-        [this](QGeoTiledMapReply::Error error, const QString &errorString) {
-            qCWarning(QGeoMultiLayerMapReplyQGCLog) << error << errorString;
-            setMapImageData(_badTile);
-            setMapImageFormat("png");
-            setCached(false);
-        },
-        Qt::AutoConnection);
 
     // 开始获取瓦片
     _startFetching();
@@ -84,25 +69,8 @@ void QGeoMultiLayerMapReplyQGC::abort() {
             reply->abort();
         }
     }
-    QGeoTiledMapReply::abort();
-}
-
-void QGeoMultiLayerMapReplyQGC::_initDataFromResources() {
-    if (_bingNoTileImage.isEmpty()) {
-        QFile file(":/res/NoTileBytes.dat");
-        if (file.open(QFile::ReadOnly)) {
-            _bingNoTileImage = file.readAll();
-            file.close();
-        }
-    }
-
-    if (_badTile.isEmpty()) {
-        QFile file(":/res/notile.png");
-        if (file.open(QFile::ReadOnly)) {
-            _badTile = file.readAll();
-            file.close();
-        }
-    }
+    // 调用父类的 abort
+    QGeoTiledMapReplyQGC::abort();
 }
 
 void QGeoMultiLayerMapReplyQGC::_startFetching() {
@@ -194,70 +162,29 @@ void QGeoMultiLayerMapReplyQGC::_startFetchingLayers() {
                 continue;
             }
 
-            QNetworkRequest request = _createRequest(layer.mapId(), x, y, zoom);
+            QNetworkRequest request = QGeoTileFetcherQGC::getNetworkRequest(layer.mapId(), x, y, zoom);
             if (request.url().isEmpty()) {
                 continue;
             }
 
-            QNetworkReply *reply = _networkManager->get(request);
-            reply->setParent(this);
-            QGCFileDownload::setIgnoreSSLErrorsIfNeeded(*reply);
+            // 复用父类方法创建网络请求（不连接父类信号）
+            QNetworkReply *reply = createNetworkRequest(request, false);
+            if (reply) {
+                // 连接信号到子类方法
+                (void)connect(reply, &QNetworkReply::finished, this,
+                               &QGeoMultiLayerMapReplyQGC::_networkReplyFinished);
+                (void)connect(reply, &QNetworkReply::errorOccurred, this,
+                               &QGeoMultiLayerMapReplyQGC::_networkReplyError);
+                (void)connect(reply, &QNetworkReply::sslErrors, this,
+                               &QGeoMultiLayerMapReplyQGC::_networkReplySslErrors);
+                (void)connect(this, &QGeoMultiLayerMapReplyQGC::aborted, reply,
+                               &QNetworkReply::abort);
 
-            _replies.insert(layer.mapId(), reply);
-            _pendingReplies++;
-
-            (void)connect(reply, &QNetworkReply::finished, this,
-                           &QGeoMultiLayerMapReplyQGC::_networkReplyFinished);
-            (void)connect(reply, &QNetworkReply::errorOccurred, this,
-                           &QGeoMultiLayerMapReplyQGC::_networkReplyError);
-            (void)connect(reply, &QNetworkReply::sslErrors, this,
-                           &QGeoMultiLayerMapReplyQGC::_networkReplySslErrors);
-            (void)connect(this, &QGeoMultiLayerMapReplyQGC::aborted, reply,
-                           &QNetworkReply::abort);
+                _replies.insert(layer.mapId(), reply);
+                _pendingReplies++;
+            }
         }
     }
-}
-
-QNetworkRequest QGeoMultiLayerMapReplyQGC::_createRequest(int mapId, int x, int y, int zoom) {
-    const SharedMapProvider mapProvider = UrlFactory::getMapProviderFromQtMapId(mapId);
-    if (!mapProvider) {
-        return QNetworkRequest();
-    }
-
-    QNetworkRequest request;
-    request.setUrl(mapProvider->getTileURL(x, y, zoom));
-    request.setRawHeader(QByteArrayLiteral("Accept"), QByteArrayLiteral("*/*"));
-    
-#if defined Q_OS_MACOS
-    static constexpr const char* s_userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.5; rv:125.0) Gecko/20100101 Firefox/125.0";
-#elif defined Q_OS_WIN
-    static constexpr const char* s_userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:100.0) Gecko/20100101 Firefox/112.0";
-#elif defined Q_OS_ANDROID
-    static constexpr const char* s_userAgent = "Mozilla/5.0 (Android 13; Tablet; rv:68.0) Gecko/68.0 Firefox/112.0";
-#elif defined Q_OS_LINUX
-    static constexpr const char* s_userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/112.0";
-#else
-    static constexpr const char* s_userAgent = "Qt Location based application";
-#endif
-    
-    request.setHeader(QNetworkRequest::UserAgentHeader, s_userAgent);
-    const QByteArray referrer = mapProvider->getReferrer().toUtf8();
-    if (!referrer.isEmpty()) {
-        request.setRawHeader(QByteArrayLiteral("Referrer"), referrer);
-    }
-    const QByteArray token = mapProvider->getToken();
-    if (!token.isEmpty()) {
-        request.setRawHeader(QByteArrayLiteral("User-Token"), token);
-    }
-    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
-                         QNetworkRequest::PreferCache);
-    request.setAttribute(QNetworkRequest::BackgroundRequestAttribute, true);
-    request.setAttribute(QNetworkRequest::CacheSaveControlAttribute, true);
-    request.setAttribute(QNetworkRequest::DoNotBufferUploadDataAttribute, false);
-    request.setPriority(QNetworkRequest::NormalPriority);
-    request.setTransferTimeout(10000);
-
-    return request;
 }
 
 void QGeoMultiLayerMapReplyQGC::_cacheReply(QGCCacheTile *tile) {
@@ -333,23 +260,24 @@ void QGeoMultiLayerMapReplyQGC::_cacheError(QGCMapTask::TaskType type,
     }
 
     if (layer) {
-        QNetworkRequest request = _createRequest(mapId, spec.x(), spec.y(), spec.zoom());
+        QNetworkRequest request = QGeoTileFetcherQGC::getNetworkRequest(mapId, spec.x(), spec.y(), spec.zoom());
         if (!request.url().isEmpty()) {
-            QNetworkReply *reply = _networkManager->get(request);
-            reply->setParent(this);
-            QGCFileDownload::setIgnoreSSLErrorsIfNeeded(*reply);
+            // 复用父类方法创建网络请求（不连接父类信号）
+            QNetworkReply *reply = createNetworkRequest(request, false);
+            if (reply) {
+                // 连接信号到子类方法
+                (void)connect(reply, &QNetworkReply::finished, this,
+                               &QGeoMultiLayerMapReplyQGC::_networkReplyFinished);
+                (void)connect(reply, &QNetworkReply::errorOccurred, this,
+                               &QGeoMultiLayerMapReplyQGC::_networkReplyError);
+                (void)connect(reply, &QNetworkReply::sslErrors, this,
+                               &QGeoMultiLayerMapReplyQGC::_networkReplySslErrors);
+                (void)connect(this, &QGeoMultiLayerMapReplyQGC::aborted, reply,
+                               &QNetworkReply::abort);
 
-            _replies.insert(mapId, reply);
-            _pendingReplies++;
-
-            (void)connect(reply, &QNetworkReply::finished, this,
-                           &QGeoMultiLayerMapReplyQGC::_networkReplyFinished);
-            (void)connect(reply, &QNetworkReply::errorOccurred, this,
-                           &QGeoMultiLayerMapReplyQGC::_networkReplyError);
-            (void)connect(reply, &QNetworkReply::sslErrors, this,
-                           &QGeoMultiLayerMapReplyQGC::_networkReplySslErrors);
-            (void)connect(this, &QGeoMultiLayerMapReplyQGC::aborted, reply,
-                           &QNetworkReply::abort);
+                _replies.insert(mapId, reply);
+                _pendingReplies++;
+            }
         }
     }
 
@@ -380,83 +308,30 @@ void QGeoMultiLayerMapReplyQGC::_networkReplyFinished() {
     reply->deleteLater();
     _replies.remove(mapId);
 
-    if (reply->error() != QNetworkReply::NoError) {
-        _pendingReplies--;
-        if (_pendingReplies == 0) {
-            // 所有请求都失败了
-            setError(QGeoTiledMapReply::CommunicationError, reply->errorString());
-        }
-        return;
-    }
-
-    if (!reply->isOpen()) {
-        _pendingReplies--;
-        if (_pendingReplies == 0) {
-            setError(QGeoTiledMapReply::ParseError, tr("Empty Reply"));
-        }
-        return;
-    }
-
-    const int statusCode =
-        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    if ((statusCode < SUCCESS_OK) ||
-        (statusCode >= REDIRECTION_MULTIPLE_CHOICES)) {
-        _pendingReplies--;
-        if (_pendingReplies == 0) {
-            setError(QGeoTiledMapReply::CommunicationError,
-                     reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute)
-                         .toString());
-        }
-        return;
-    }
-
-    QByteArray image = reply->readAll();
-    if (image.isEmpty()) {
-        _pendingReplies--;
-        if (_pendingReplies == 0) {
-            setError(QGeoTiledMapReply::ParseError, tr("Image is Empty"));
-        }
-        return;
-    }
-
-    const SharedMapProvider mapProvider =
-        UrlFactory::getMapProviderFromQtMapId(mapId);
-    if (!mapProvider) {
-        _pendingReplies--;
-        if (_pendingReplies == 0) {
-            setError(QGeoTiledMapReply::UnknownError, tr("Invalid Provider"));
-        }
-        return;
-    }
-
-    if (mapProvider->isBingProvider() && (image == _bingNoTileImage)) {
-        _pendingReplies--;
-        if (_pendingReplies == 0) {
-            setError(QGeoTiledMapReply::CommunicationError,
-                     tr("Bing Tile Above Zoom Level"));
-        }
-        return;
-    }
-
-    if (mapProvider->isElevationProvider()) {
-        const SharedElevationProvider elevationProvider =
-            std::dynamic_pointer_cast<const ElevationProvider>(mapProvider);
-        image = elevationProvider->serialize(image);
-        if (image.isEmpty()) {
+    // 复用父类的网络回复处理逻辑
+    QByteArray image;
+    QString format;
+    if (!processNetworkReply(reply, mapId, image, format)) {
+        // 处理失败，检查错误类型
+        if (reply->error() != QNetworkReply::NoError) {
             _pendingReplies--;
             if (_pendingReplies == 0) {
-                setError(QGeoTiledMapReply::ParseError,
-                         tr("Failed to Serialize Terrain Tile"));
+                setError(QGeoTiledMapReply::CommunicationError, reply->errorString());
             }
-            return;
+        } else {
+            _pendingReplies--;
+            if (_pendingReplies == 0) {
+                setError(QGeoTiledMapReply::ParseError, tr("Failed to process tile"));
+            }
         }
+        return;
     }
 
     // 存储瓦片数据
     TileImageData tileData;
     tileData.imageData = image;
-    tileData.format = mapProvider->getImageFormat(image);
-    tileData.isValid = !tileData.format.isEmpty();
+    tileData.format = format;
+    tileData.isValid = true;
     _tiles.insert(mapId, tileData);
 
     // 检查是否全部完成

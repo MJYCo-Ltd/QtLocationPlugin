@@ -45,14 +45,38 @@ QGeoTiledMapReplyQGC::QGeoTiledMapReplyQGC(
         },
         Qt::AutoConnection);
 
-    QGCFetchTileTask *const task = QGeoFileTileCacheQGC::createFetchTileTask(
-        UrlFactory::getProviderTypeFromQtMapId(spec.mapId()), spec.x(), spec.y(),
-        spec.zoom());
-    (void)connect(task, &QGCFetchTileTask::tileFetched, this,
-                   &QGeoTiledMapReplyQGC::_cacheReply);
-    (void)connect(task, &QGCMapTask::error, this,
-                   &QGeoTiledMapReplyQGC::_cacheError);
-    getQGCMapEngine()->addTask(task);
+    initializeFromCache();
+}
+
+QGeoTiledMapReplyQGC::QGeoTiledMapReplyQGC(
+    QNetworkAccessManager *networkManager,
+    const QGeoTileSpec &spec, QObject *parent)
+    : QGeoTiledMapReply(spec, parent), _networkManager(networkManager) {
+    _initDataFromResources();
+
+    (void)connect(
+        this, &QGeoTiledMapReplyQGC::errorOccurred, this,
+        [this](QGeoTiledMapReply::Error error, const QString &errorString) {
+        qCWarning(QGeoTiledMapReplyQGCLog) << error << errorString;
+        setMapImageData(_badTile);
+        setMapImageFormat("png");
+        setCached(false);
+        },
+        Qt::AutoConnection);
+    // 延迟初始化，不自动从缓存获取
+}
+
+void QGeoTiledMapReplyQGC::initializeFromCache() {
+    if (!_request.url().isEmpty()) {
+        QGCFetchTileTask *const task = QGeoFileTileCacheQGC::createFetchTileTask(
+            UrlFactory::getProviderTypeFromQtMapId(tileSpec().mapId()), 
+            tileSpec().x(), tileSpec().y(), tileSpec().zoom());
+        (void)connect(task, &QGCFetchTileTask::tileFetched, this,
+                       &QGeoTiledMapReplyQGC::_cacheReply);
+        (void)connect(task, &QGCMapTask::error, this,
+                       &QGeoTiledMapReplyQGC::_cacheError);
+        getQGCMapEngine()->addTask(task);
+    }
 }
 
 QGeoTiledMapReplyQGC::~QGeoTiledMapReplyQGC() {}
@@ -216,20 +240,81 @@ void QGeoTiledMapReplyQGC::_cacheError(QGCMapTask::TaskType type,
         return;
     }
 
-    _request.setOriginatingObject(this);
-
-    QNetworkReply *const reply = _networkManager->get(_request);
-    reply->setParent(this);
-    QGCFileDownload::setIgnoreSSLErrorsIfNeeded(*reply);
-
-    (void)connect(reply, &QNetworkReply::finished, this,
-                   &QGeoTiledMapReplyQGC::_networkReplyFinished);
-    (void)connect(reply, &QNetworkReply::errorOccurred, this,
-                   &QGeoTiledMapReplyQGC::_networkReplyError);
-    (void)connect(reply, &QNetworkReply::sslErrors, this,
-                   &QGeoTiledMapReplyQGC::_networkReplySslErrors);
-    (void)connect(this, &QGeoTiledMapReplyQGC::aborted, reply,
-                   &QNetworkReply::abort);
+    (void)createNetworkRequest(_request);
 }
 
 void QGeoTiledMapReplyQGC::abort() { QGeoTiledMapReply::abort(); }
+
+QNetworkReply* QGeoTiledMapReplyQGC::createNetworkRequest(const QNetworkRequest &request, bool connectSignals) {
+    QNetworkRequest req = request;
+    req.setOriginatingObject(this);
+    
+    QNetworkReply *const reply = _networkManager->get(req);
+    reply->setParent(this);
+    QGCFileDownload::setIgnoreSSLErrorsIfNeeded(*reply);
+
+    if (connectSignals) {
+        (void)connect(reply, &QNetworkReply::finished, this,
+                       &QGeoTiledMapReplyQGC::_networkReplyFinished);
+        (void)connect(reply, &QNetworkReply::errorOccurred, this,
+                       &QGeoTiledMapReplyQGC::_networkReplyError);
+        (void)connect(reply, &QNetworkReply::sslErrors, this,
+                       &QGeoTiledMapReplyQGC::_networkReplySslErrors);
+        (void)connect(this, &QGeoTiledMapReplyQGC::aborted, reply,
+                       &QNetworkReply::abort);
+    }
+    
+    return reply;
+}
+
+bool QGeoTiledMapReplyQGC::processNetworkReply(QNetworkReply *reply, int mapId, QByteArray &image, QString &format) {
+    if (!reply) {
+        return false;
+    }
+
+    if (reply->error() != QNetworkReply::NoError) {
+        return false;
+    }
+
+    if (!reply->isOpen()) {
+        return false;
+    }
+
+    const int statusCode =
+        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if ((statusCode < HTTP_Response::SUCCESS_OK) ||
+        (statusCode >= HTTP_Response::REDIRECTION_MULTIPLE_CHOICES)) {
+        return false;
+    }
+
+    image = reply->readAll();
+    if (image.isEmpty()) {
+        return false;
+    }
+
+    const SharedMapProvider mapProvider =
+        UrlFactory::getMapProviderFromQtMapId(mapId);
+    if (!mapProvider) {
+        return false;
+    }
+
+    if (mapProvider->isBingProvider() && (image == _bingNoTileImage)) {
+        return false;
+    }
+
+    if (mapProvider->isElevationProvider()) {
+        const SharedElevationProvider elevationProvider =
+            std::dynamic_pointer_cast<const ElevationProvider>(mapProvider);
+        image = elevationProvider->serialize(image);
+        if (image.isEmpty()) {
+            return false;
+        }
+    }
+
+    format = mapProvider->getImageFormat(image);
+    if (format.isEmpty()) {
+        return false;
+    }
+
+    return true;
+}

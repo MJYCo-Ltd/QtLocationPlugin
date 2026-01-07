@@ -27,22 +27,36 @@ class QGeoTiledMapReplyQGC : public QGeoTiledMapReply
 
 public:
     QGeoTiledMapReplyQGC(QNetworkAccessManager *networkManager, const QNetworkRequest &request, const QGeoTileSpec &spec, QObject *parent = nullptr);
+    // 延迟初始化构造函数（用于子类）
+    QGeoTiledMapReplyQGC(QNetworkAccessManager *networkManager, const QGeoTileSpec &spec, QObject *parent = nullptr);
     ~QGeoTiledMapReplyQGC();
 
-    void abort() final;
+    void abort();
+    
+    // 允许子类调用初始化
+    void initializeFromCache();
 
-private slots:
-    void _networkReplyFinished();
-    void _networkReplyError(QNetworkReply::NetworkError error);
-    void _networkReplySslErrors(const QList<QSslError> &errors);
-    void _cacheReply(QGCCacheTile *tile);
-    void _cacheError(QGCMapTask::TaskType type, QStringView errorString);
+protected:
+    // 允许子类访问
+    QNetworkAccessManager *_networkManager = nullptr;
+    QNetworkRequest _request;
+
+    // 辅助方法：创建网络请求（供子类复用）
+    // connectSignals: 是否连接到父类的槽函数（子类通常设为 false，自己连接）
+    QNetworkReply* createNetworkRequest(const QNetworkRequest &request, bool connectSignals = true);
+    // 辅助方法：处理单个网络回复的验证和解析（供子类复用）
+    bool processNetworkReply(QNetworkReply *reply, int mapId, QByteArray &image, QString &format);
+
+protected slots:
+    // 允许子类重写
+    virtual void _networkReplyFinished();
+    virtual void _networkReplyError(QNetworkReply::NetworkError error);
+    virtual void _networkReplySslErrors(const QList<QSslError> &errors);
+    virtual void _cacheReply(QGCCacheTile *tile);
+    virtual void _cacheError(QGCMapTask::TaskType type, QStringView errorString);
 
 private:
     static void _initDataFromResources();
-
-    QNetworkAccessManager *_networkManager = nullptr;
-    QNetworkRequest _request;
 
     static QByteArray _bingNoTileImage;
     static QByteArray _badTile;

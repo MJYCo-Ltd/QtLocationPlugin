@@ -170,10 +170,6 @@ QGeoTiledMapReply *QGeoTileFetcherQGC::getMultiLayerTileImage(const QGeoTileSpec
 
         return new QGeoTiledMapReplyQGC(m_networkManager, request, spec);
     }
-
-    // 多图层模式：使用多图层回复类进行异步合成
-    qCDebug(QGeoTileFetcherQGCLog) 
-        << "Multi-layer tile requested with" << visibleLayers.count() << "layers";
     
     return new QGeoMultiLayerMapReplyQGC(m_networkManager, spec, layerStack);
 }

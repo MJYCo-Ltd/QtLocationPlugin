@@ -112,3 +112,9 @@ install(TARGETS QGCLocation
     RUNTIME DESTINATION ${_qt_prefix}/plugins/geoservices
     LIBRARY DESTINATION ${_qt_prefix}/plugins/geoservices
 )
+
+# 可选：包含 Test 子项目
+option(BUILD_TEST "Build Test executable" ON)
+if(BUILD_TEST)
+    add_subdirectory(Test)
+endif()

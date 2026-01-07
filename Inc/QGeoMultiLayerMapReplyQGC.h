@@ -10,14 +10,11 @@
 #pragma once
 
 #include <QtCore/QLoggingCategory>
-#include <QtLocation/private/qgeotiledmapreply_p.h>
 #include <QtNetwork/QNetworkReply>
-#include <QtNetwork/QNetworkRequest>
 #include <QtCore/QHash>
+#include "QGeoMapReplyQGC.h"
 #include "QGCMapLayerConfig.h"
 #include "QGCTileCompositor.h"
-#include "QGCMapTasks.h"
-#include "QGCCacheTile.h"
 
 Q_DECLARE_LOGGING_CATEGORY(QGeoMultiLayerMapReplyQGCLog)
 
@@ -27,8 +24,9 @@ class QSslError;
 /**
  * @brief 多图层瓦片回复类
  * 负责并行获取多个图层的瓦片，并在全部完成后进行合成
+ * 继承自 QGeoTiledMapReplyQGC 以复用缓存、错误处理等逻辑
  */
-class QGeoMultiLayerMapReplyQGC : public QGeoTiledMapReply
+class QGeoMultiLayerMapReplyQGC : public QGeoTiledMapReplyQGC
 {
     Q_OBJECT
 
@@ -42,20 +40,19 @@ public:
     void abort() final;
 
 private slots:
-    void _networkReplyFinished();
-    void _networkReplyError(QNetworkReply::NetworkError error);
-    void _networkReplySslErrors(const QList<QSslError> &errors);
-    void _cacheReply(QGCCacheTile *tile);
-    void _cacheError(QGCMapTask::TaskType type, QStringView errorString);
+    // 重写父类方法以处理多图层逻辑
+    void _networkReplyFinished() override;
+    void _networkReplyError(QNetworkReply::NetworkError error) override;
+    void _networkReplySslErrors(const QList<QSslError> &errors) override;
+    void _cacheReply(QGCCacheTile *tile) override;
+    void _cacheError(QGCMapTask::TaskType type, QStringView errorString) override;
 
 private:
     void _startFetching();
     void _startFetchingLayers();
     void _compositeTiles();
-    void _initDataFromResources();
-    QNetworkRequest _createRequest(int mapId, int x, int y, int zoom);
+    void _handleSingleLayerReply(int mapId, const QByteArray &image, const QString &format);
 
-    QNetworkAccessManager *_networkManager = nullptr;
     MapLayerStack _layerStack;
     QList<MapLayer> _visibleLayers;
     
@@ -68,9 +65,6 @@ private:
     
     int _pendingReplies = 0;
     bool _compositing = false;
-
-    static QByteArray _bingNoTileImage;
-    static QByteArray _badTile;
 
     enum HTTP_Response {
         SUCCESS_OK = 200,
