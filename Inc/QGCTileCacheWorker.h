@@ -19,8 +19,8 @@
 #pragma once
 
 #include <QtCore/QLoggingCategory>
+#include <QtCore/QList>
 #include <QtCore/QMutex>
-#include <QtCore/QQueue>
 #include <QtCore/QString>
 #include <QtCore/QThread>
 #include <QtCore/QWaitCondition>
@@ -82,7 +82,7 @@ private:
 
     std::shared_ptr<QSqlDatabase> _db = nullptr;
     QMutex _taskQueueMutex;
-    QQueue<QGCMapTask*> _taskQueue;
+    QList<QGCMapTask*> _taskQueue;  // 改为 QList 以支持 LIFO 和 FIFO
     QWaitCondition _waitc;
     QString _databasePath;
     quint32 _defaultCount = 0;

@@ -33,10 +33,17 @@ QGeoTileFetcherQGC::QGeoTileFetcherQGC(QNetworkAccessManager *networkManager,
 QGeoTileFetcherQGC::~QGeoTileFetcherQGC() {}
 
 QGeoTiledMapReply *QGeoTileFetcherQGC::getTileImage(const QGeoTileSpec &spec) {
-    // 检查是否启用多图层
+    // 检查网络管理器是否已初始化
+    if (!m_networkManager) {
+        return nullptr;
+    }
+
+    // 检查是否启用多图层（优先检查，确保所有 mapId 都使用多图层配置）
     if (m_engine) {
         MapLayerStack layerStack = getLayerStackForMapId(spec.mapId());
         if (!layerStack.isEmpty()) {
+            // 多图层模式：无论 spec.mapId() 是什么，都使用配置的图层栈
+            // 这样可以确保即使 activeMapType 在初始化时是街道地图，也会使用配置的卫星图层
             return getMultiLayerTileImage(spec, layerStack);
         }
     }
@@ -133,6 +140,13 @@ MapLayerStack QGeoTileFetcherQGC::getLayerStackForMapId(int mapId) const
 QGeoTiledMapReply *QGeoTileFetcherQGC::getMultiLayerTileImage(const QGeoTileSpec &spec, const MapLayerStack &layerStack)
 {
     if (layerStack.isEmpty()) {
+        qCWarning(QGeoTileFetcherQGCLog) << "Empty layer stack for tile" << spec.x() << spec.y();
+        return nullptr;
+    }
+
+    // 确保网络管理器已初始化
+    if (!m_networkManager) {
+        qCWarning(QGeoTileFetcherQGCLog) << "Network manager not initialized";
         return nullptr;
     }
 

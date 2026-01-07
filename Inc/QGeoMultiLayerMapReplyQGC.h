@@ -51,6 +51,8 @@ private:
     void _startFetching();
     void _startFetchingLayers();
     void _compositeTiles();
+    // 辅助方法：为指定图层创建并连接网络请求
+    void _createLayerNetworkRequest(int mapId, int x, int y, int zoom);
     void _handleSingleLayerReply(int mapId, const QByteArray &image, const QString &format);
 
     MapLayerStack _layerStack;

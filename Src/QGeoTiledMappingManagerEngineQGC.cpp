@@ -136,12 +136,8 @@ void QGeoTiledMappingManagerEngineQGC::parseLayerConfiguration(const QVariantMap
     m_layerStack = MapLayerStack::fromParameters(parameters);
 
     if (m_layerStack.isEmpty()) {
-        qCDebug(QGeoTiledMappingManagerEngineQGCLog) << "Multi-layer not enabled or no layers configured";
         return;
     }
-
-    qCDebug(QGeoTiledMappingManagerEngineQGCLog) 
-        << "Multi-layer enabled with" << m_layerStack.count() << "layers";
 
     // 在多图层模式下，为所有支持的 mapId 创建映射
     // 这样无论用户选择哪个 activeMapType，都会使用相同的图层配置
@@ -150,9 +146,6 @@ void QGeoTiledMappingManagerEngineQGC::parseLayerConfiguration(const QVariantMap
     for (const SharedMapProvider &provider : providers) {
         m_mapIdToLayerStack.insert(provider->getMapId(), m_layerStack);
     }
-    
-    qCDebug(QGeoTiledMappingManagerEngineQGCLog) 
-        << "Multi-layer configuration applied to all" << m_mapIdToLayerStack.count() << "map types";
 }
 
 MapLayerStack QGeoTiledMappingManagerEngineQGC::getLayerStackForMapId(int mapId) const

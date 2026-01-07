@@ -47,9 +47,9 @@ private:
     static QString _getCachePath(const QVariantMap &parameters);
     static uint32_t _getMemLimit(const QVariantMap &Parameters);
 
-    static uint32_t _getDefaultMaxMemLimit() { return (3 * pow(1024, 2)); }
-    static uint32_t _getDefaultMaxDiskCache() { return (6 * pow(1024, 2));}
-    static uint32_t _getDefaultExtraTexture() { return (6 * pow(1024, 2)); }
+    static uint32_t _getDefaultMaxMemLimit() { return (30 * pow(1024, 2)); }
+    static uint32_t _getDefaultMaxDiskCache() { return (60 * pow(1024, 2));}
+    static uint32_t _getDefaultExtraTexture() { return (60 * pow(1024, 2)); }
     static uint32_t _getDefaultMinTexture() { return 0; }
 
     static quint32 _getMaxMemCacheSetting();

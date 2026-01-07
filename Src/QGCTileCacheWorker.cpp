@@ -48,9 +48,18 @@ bool QGCCacheWorker::enqueueTask(QGCMapTask *task) {
         return false;
     }
 
-    // TODO: Prepend Stop Task Instead?
     QMutexLocker lock(&_taskQueueMutex);
-    _taskQueue.enqueue(task);
+    
+    // 对于获取瓦片的任务（taskFetchTile），使用 LIFO（后进先出）优先处理最新请求
+    // 其他任务使用 FIFO（先进先出）保持原有顺序
+    if (task->type() == QGCMapTask::taskFetchTile) {
+        // 将新任务插入到队列前面，优先处理最新的请求
+        _taskQueue.prepend(task);
+    } else {
+        // 其他任务添加到队列尾部，保持 FIFO 顺序
+        _taskQueue.append(task);
+    }
+    
     lock.unlock();
 
     if (isRunning()) {
@@ -79,7 +88,8 @@ void QGCCacheWorker::run() {
     QMutexLocker lock(&_taskQueueMutex);
     while (!_stop) {
         if (!_taskQueue.isEmpty()) {
-            QGCMapTask *const task = _taskQueue.dequeue();
+            // 从队列头部取出任务（无论是 LIFO 还是 FIFO，都从头部取）
+            QGCMapTask *const task = _taskQueue.takeFirst();
             lock.unlock();
             _runTask(task);
             lock.relock();
@@ -287,10 +297,10 @@ void QGCCacheWorker::_getTile(QGCMapTask *mtask) {
 
     QGCFetchTileTask *task = static_cast<QGCFetchTileTask *>(mtask);
     QSqlQuery query(*_db);
-    const QString s =
-        QStringLiteral("SELECT tile, format, type FROM Tiles WHERE hash = \"%1\"")
-                          .arg(task->hash());
-    if (query.exec(s) && query.next()) {
+    // 使用参数化查询以提高性能和安全性
+    query.prepare("SELECT tile, format, type FROM Tiles WHERE hash = ?");
+    query.addBindValue(task->hash());
+    if (query.exec() && query.next()) {
         const QByteArray &arrray = query.value(0).toByteArray();
         const QString &format = query.value(1).toString();
         const QString &type = query.value(2).toString();
@@ -433,9 +443,10 @@ quint64 QGCCacheWorker::_findTile(const QString &hash) {
     quint64 tileID = 0;
 
     QSqlQuery query(*_db);
-    const QString s =
-        QStringLiteral("SELECT tileID FROM Tiles WHERE hash = \"%1\"").arg(hash);
-    if (query.exec(s) && query.next()) {
+    // 使用参数化查询以提高性能
+    query.prepare("SELECT tileID FROM Tiles WHERE hash = ?");
+    query.addBindValue(hash);
+    if (query.exec() && query.next()) {
         tileID = query.value(0).toULongLong();
     }
 

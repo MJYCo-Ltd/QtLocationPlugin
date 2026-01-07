@@ -32,32 +32,49 @@ TileImageData TileCompositor::composite(const QList<MapLayer> &layers,
     
     int firstValidIndex = -1;
     for (int i = 0; i < layers.count(); ++i) {
-        if (layers.at(i).visible() && tiles.at(i).isValid) {
-            baseImage = imageFromData(tiles.at(i).imageData, tiles.at(i).format);
-            if (!baseImage.isNull()) {
-                outputFormat = tiles.at(i).format;
+        // 检查索引有效性
+        if (i >= tiles.count()) {
+            qCWarning(QGCTileCompositorLog) << "Index out of range:" << i;
+            break;
+        }
+        
+        const TileImageData &tile = tiles.at(i);
+        // 验证瓦片数据有效性
+        if (layers.at(i).visible() && tile.isValid && 
+            !tile.imageData.isEmpty() && !tile.format.isEmpty()) {
+            baseImage = imageFromData(tile.imageData, tile.format);
+            if (!baseImage.isNull() && baseImage.width() > 0 && baseImage.height() > 0) {
+                outputFormat = tile.format;
                 firstValidIndex = i;
                 break;
             }
         }
     }
 
-    if (baseImage.isNull()) {
+    if (baseImage.isNull() || baseImage.width() == 0 || baseImage.height() == 0) {
         qCWarning(QGCTileCompositorLog) << "No valid base image found";
         return result;
     }
 
     // 从第一个有效图层之后开始合成
     for (int i = firstValidIndex + 1; i < layers.count(); ++i) {
+        // 检查索引有效性
+        if (i >= layers.count() || i >= tiles.count()) {
+            qCWarning(QGCTileCompositorLog) << "Index out of range:" << i;
+            break;
+        }
+        
         const MapLayer &layer = layers.at(i);
         const TileImageData &tile = tiles.at(i);
 
-        if (!layer.visible() || !tile.isValid) {
+        // 验证瓦片数据有效性
+        if (!layer.visible() || !tile.isValid || 
+            tile.imageData.isEmpty() || tile.format.isEmpty()) {
             continue;
         }
 
         QImage overlayImage = imageFromData(tile.imageData, tile.format);
-        if (overlayImage.isNull()) {
+        if (overlayImage.isNull() || overlayImage.width() == 0 || overlayImage.height() == 0) {
             continue;
         }
 
@@ -66,10 +83,21 @@ TileImageData TileCompositor::composite(const QList<MapLayer> &layers,
             overlayImage = overlayImage.scaled(baseImage.size(), 
                                                Qt::IgnoreAspectRatio, 
                                                Qt::SmoothTransformation);
+            // 检查缩放后的图像是否有效
+            if (overlayImage.isNull() || overlayImage.width() == 0 || overlayImage.height() == 0) {
+                qCWarning(QGCTileCompositorLog) << "Failed to scale overlay image";
+                continue;
+            }
         }
 
         // 合成图像
-        baseImage = compositeImages(baseImage, overlayImage, layer.opacity());
+        QImage compositeResult = compositeImages(baseImage, overlayImage, layer.opacity());
+        if (compositeResult.isNull() || compositeResult.width() == 0 || compositeResult.height() == 0) {
+            qCWarning(QGCTileCompositorLog) << "Failed to composite images at layer" << i;
+            continue;
+        }
+        
+        baseImage = compositeResult;
     }
 
     // 转换回字节数组
@@ -81,31 +109,46 @@ TileImageData TileCompositor::composite(const QList<MapLayer> &layers,
 }
 
 QImage TileCompositor::compositeImages(const QImage &base, const QImage &overlay, qreal opacity) {
-    if (base.isNull()) {
+    if (base.isNull() || base.width() == 0 || base.height() == 0) {
         return overlay;
     }
-    if (overlay.isNull()) {
+    if (overlay.isNull() || overlay.width() == 0 || overlay.height() == 0) {
         return base;
     }
 
     QImage result = base.copy();
+    if (result.isNull() || result.width() == 0 || result.height() == 0) {
+        qCWarning(QGCTileCompositorLog) << "Failed to copy base image";
+        return base;
+    }
+
     QPainter painter(&result);
+    if (!painter.isActive()) {
+        qCWarning(QGCTileCompositorLog) << "Failed to create painter";
+        return base;
+    }
     
     // 设置合成模式
     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
     
-    // 设置透明度
-    painter.setOpacity(opacity);
+    // 设置透明度（确保在有效范围内）
+    painter.setOpacity(qBound(0.0, opacity, 1.0));
     
     // 绘制叠加层
     painter.drawImage(0, 0, overlay);
     painter.end();
 
+    // 验证结果
+    if (result.isNull() || result.width() == 0 || result.height() == 0) {
+        qCWarning(QGCTileCompositorLog) << "Composite result is invalid";
+        return base;
+    }
+
     return result;
 }
 
 QImage TileCompositor::imageFromData(const QByteArray &data, const QString &format) {
-    if (data.isEmpty()) {
+    if (data.isEmpty() || data.isNull()) {
         return QImage();
     }
 
@@ -114,7 +157,10 @@ QImage TileCompositor::imageFromData(const QByteArray &data, const QString &form
     // 使用 QBuffer 作为 QImageReader 的输入设备
     QBuffer buffer;
     buffer.setData(data);
-    buffer.open(QIODevice::ReadOnly);
+    if (!buffer.open(QIODevice::ReadOnly)) {
+        qCWarning(QGCTileCompositorLog) << "Failed to open buffer for reading";
+        return QImage();
+    }
     
     QImageReader reader(&buffer);
     if (!format.isEmpty()) {
@@ -127,14 +173,27 @@ QImage TileCompositor::imageFromData(const QByteArray &data, const QString &form
     
     // 如果读取失败，尝试使用 QImage::loadFromData 自动检测格式
     if (image.isNull()) {
-        image.loadFromData(data);
+        if (!image.loadFromData(data)) {
+            qCWarning(QGCTileCompositorLog) << "Failed to load image from data, format:" << format;
+            return QImage();
+        }
+    }
+
+    // 验证图像有效性
+    if (image.isNull() || image.width() == 0 || image.height() == 0) {
+        qCWarning(QGCTileCompositorLog) << "Invalid image dimensions";
+        return QImage();
     }
 
     // 确保图像格式支持透明度
-    if (!image.isNull() && 
-        image.format() != QImage::Format_ARGB32 && 
+    if (image.format() != QImage::Format_ARGB32 && 
         image.format() != QImage::Format_ARGB32_Premultiplied) {
         image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        // 检查转换后的图像是否有效
+        if (image.isNull() || image.width() == 0 || image.height() == 0) {
+            qCWarning(QGCTileCompositorLog) << "Failed to convert image format";
+            return QImage();
+        }
     }
 
     return image;

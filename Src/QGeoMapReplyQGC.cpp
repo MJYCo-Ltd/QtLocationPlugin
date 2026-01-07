@@ -246,10 +246,20 @@ void QGeoTiledMapReplyQGC::_cacheError(QGCMapTask::TaskType type,
 void QGeoTiledMapReplyQGC::abort() { QGeoTiledMapReply::abort(); }
 
 QNetworkReply* QGeoTiledMapReplyQGC::createNetworkRequest(const QNetworkRequest &request, bool connectSignals) {
+    if (!_networkManager) {
+        qCWarning(QGeoTiledMapReplyQGCLog) << "Network manager not initialized";
+        return nullptr;
+    }
+
     QNetworkRequest req = request;
     req.setOriginatingObject(this);
     
     QNetworkReply *const reply = _networkManager->get(req);
+    if (!reply) {
+        qCWarning(QGeoTiledMapReplyQGCLog) << "Failed to create network reply";
+        return nullptr;
+    }
+    
     reply->setParent(this);
     QGCFileDownload::setIgnoreSSLErrorsIfNeeded(*reply);
 
