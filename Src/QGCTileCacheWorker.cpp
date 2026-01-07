@@ -102,12 +102,51 @@ void QGCCacheWorker::run() {
     QMutexLocker lock(&_taskQueueMutex);
     while (!_stop) {
         if (!_taskQueue.isEmpty()) {
-            // 从队列头部取出任务（无论是 LIFO 还是 FIFO，都从头部取）
-            QGCMapTask *const task = _taskQueue.takeFirst();
-            lock.unlock();
-            _runTask(task);
-            lock.relock();
-            task->deleteLater();
+            // 批量处理优化：收集连续的 saveTile 任务，批量插入数据库
+            QGCMapTask *firstTask = _taskQueue.first();
+            
+            // 如果第一个任务是 saveTile，尝试收集更多连续的 saveTile 任务
+            if (firstTask && firstTask->type() == QGCMapTask::taskCacheTile) {
+                QList<QGCMapTask *> batchTasks;
+                const int maxBatchSize = 50; // 每批最多处理 50 个瓦片
+                while (!_taskQueue.isEmpty() && 
+                       batchTasks.size() < maxBatchSize &&
+                       _taskQueue.first() &&
+                       _taskQueue.first()->type() == QGCMapTask::taskCacheTile) {
+                    batchTasks.append(_taskQueue.takeFirst());
+                }
+                
+                if (batchTasks.size() > 1) {
+                    // 批量处理多个 saveTile 任务
+                    lock.unlock();
+                    _saveTilesBatch(batchTasks);
+                    lock.relock();
+                    // 批量删除任务
+                    for (QGCMapTask *task : batchTasks) {
+                        if (task) {
+                            task->deleteLater();
+                        }
+                    }
+                } else if (batchTasks.size() == 1) {
+                    // 只有一个任务，使用原有逻辑（任务已经在 batchTasks 中）
+                    QGCMapTask *const task = batchTasks.first();
+                    lock.unlock();
+                    if (task) {
+                        _runTask(task);
+                        task->deleteLater();
+                    }
+                    lock.relock();
+                }
+            } else {
+                // 非 saveTile 任务，使用原有逻辑
+                QGCMapTask *const task = _taskQueue.takeFirst();
+                lock.unlock();
+                if (task) {
+                    _runTask(task);
+                    task->deleteLater();
+                }
+                lock.relock();
+            }
 
             const qsizetype count = _taskQueue.count();
             if (count > 100) {
@@ -327,6 +366,99 @@ void QGCCacheWorker::_saveTile(QGCMapTask *mtask) {
         qCWarning(QGCTileCacheWorkerLog)
             << "Map Cache SQL error (add tile into SetTiles):"
             << query.lastError().text();
+    }
+}
+
+void QGCCacheWorker::_saveTilesBatch(QList<QGCMapTask *> &tasks) {
+    if (!_valid || tasks.isEmpty() || !_db) {
+        return;
+    }
+
+    // 开始事务，批量插入可以大幅提高性能
+    if (!_db->transaction()) {
+        qCWarning(QGCTileCacheWorkerLog)
+            << "Map Cache SQL error (begin transaction):" << _db->lastError().text();
+        return;
+    }
+
+    const quint64 defaultSetID = _getDefaultTileSet();
+    const qint64 currentTime = QDateTime::currentSecsSinceEpoch();
+    
+    int insertedCount = 0;
+    int skippedCount = 0;
+
+    for (QGCMapTask *mtask : tasks) {
+        if (!mtask) {
+            continue;
+        }
+        
+        QGCSaveTileTask *task = qobject_cast<QGCSaveTileTask *>(mtask);
+        if (!task) {
+            continue;
+        }
+        
+        // 安全获取 tile 对象
+        QGCCacheTile *tile = task->tile();
+        if (!tile) {
+            continue;
+        }
+
+        // 为每个瓦片创建新的查询对象，避免重用导致的错误
+        QSqlQuery insertQuery(*_db);
+        (void)insertQuery.prepare("INSERT OR IGNORE INTO Tiles(hash, format, tile, size, type, date) "
+                                  "VALUES(?, ?, ?, ?, ?, ?)");
+        insertQuery.addBindValue(tile->hash());
+        insertQuery.addBindValue(tile->format());
+        insertQuery.addBindValue(tile->img());
+        insertQuery.addBindValue(tile->img().size());
+        insertQuery.addBindValue(tile->type());
+        insertQuery.addBindValue(currentTime);
+        
+        if (!insertQuery.exec()) {
+            qCWarning(QGCTileCacheWorkerLog)
+                << "Map Cache SQL error (batch insert tile):"
+                << insertQuery.lastError().text();
+            continue;
+        }
+
+        quint64 tileID = 0;
+        if (insertQuery.numRowsAffected() > 0) {
+            // 新插入的瓦片
+            tileID = insertQuery.lastInsertId().toULongLong();
+            insertedCount++;
+        } else {
+            // 瓦片已存在，查询现有的 tileID
+            QSqlQuery findQuery(*_db);
+            findQuery.prepare("SELECT tileID FROM Tiles WHERE hash = ?");
+            findQuery.addBindValue(tile->hash());
+            if (findQuery.exec() && findQuery.next()) {
+                tileID = findQuery.value(0).toULongLong();
+                skippedCount++;
+            } else {
+                continue;
+            }
+        }
+
+        // 添加到 SetTiles
+        const quint64 setID = tile->tileSet() == UINT64_MAX
+                                  ? defaultSetID
+                                  : tile->tileSet();
+        QSqlQuery setTilesQuery(*_db);
+        setTilesQuery.prepare("INSERT OR IGNORE INTO SetTiles(tileID, setID) VALUES(?, ?)");
+        setTilesQuery.addBindValue(tileID);
+        setTilesQuery.addBindValue(setID);
+        if (!setTilesQuery.exec()) {
+            qCWarning(QGCTileCacheWorkerLog)
+                << "Map Cache SQL error (batch insert SetTiles):"
+                << setTilesQuery.lastError().text();
+        }
+    }
+
+    // 提交事务
+    if (!_db->commit()) {
+        qCWarning(QGCTileCacheWorkerLog)
+            << "Map Cache SQL error (commit transaction):" << _db->lastError().text();
+        _db->rollback();
     }
 }
 
@@ -1131,8 +1263,32 @@ bool QGCCacheWorker::_connectDB() {
     (void)_db.reset(
         new QSqlDatabase(QSqlDatabase::addDatabase("QSQLITE", kSession)));
     _db->setDatabaseName(_databasePath);
-    _db->setConnectOptions("QSQLITE_ENABLE_SHARED_CACHE");
+    // 启用共享缓存和 WAL 模式以提高并发性能
+    // QSQLITE_ENABLE_SHARED_CACHE: 允许多个连接共享缓存
+    // QSQLITE_BUSY_TIMEOUT: 设置忙等待超时（毫秒）
+    _db->setConnectOptions("QSQLITE_ENABLE_SHARED_CACHE;QSQLITE_BUSY_TIMEOUT=5000");
     _valid = _db->open();
+    
+    if (_valid) {
+        // 启用 WAL (Write-Ahead Logging) 模式，大幅提高并发写入性能
+        // WAL 模式允许多个读取和一个写入同时进行，而不需要锁整个数据库
+        QSqlQuery query(*_db);
+        if (!query.exec("PRAGMA journal_mode=WAL")) {
+            qCWarning(QGCTileCacheWorkerLog) 
+                << "Failed to enable WAL mode:" << query.lastError().text();
+        } else {
+            // 设置同步模式为 NORMAL（在 WAL 模式下更安全且性能更好）
+            // NORMAL 模式在 WAL 下比 FULL 模式快很多，但仍保证数据完整性
+            (void)query.exec("PRAGMA synchronous=NORMAL");
+            // 设置 WAL 自动检查点大小（默认 1000 页，约 4MB）
+            // 可以根据需要调整，更大的值可以减少检查点频率，提高写入性能
+            (void)query.exec("PRAGMA wal_autocheckpoint=2000");
+            // 设置缓存大小（页数，每页 4KB，这里设置为 16MB）
+            (void)query.exec("PRAGMA cache_size=-4096");
+            qCDebug(QGCTileCacheWorkerLog) << "WAL mode enabled for better concurrent write performance";
+        }
+    }
+    
     return _valid;
 }
 

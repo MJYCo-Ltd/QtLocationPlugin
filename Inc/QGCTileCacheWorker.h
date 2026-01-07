@@ -55,6 +55,7 @@ private:
     void _runTask(QGCMapTask *task);
 
     void _saveTile(QGCMapTask *task);
+    void _saveTilesBatch(QList<QGCMapTask *> &tasks);
     void _getTile(QGCMapTask *task);
     void _getTileSets(QGCMapTask *task);
     void _createTileSet(QGCMapTask *task);
