@@ -25,12 +25,12 @@ Window {
             // 直接指定图层列表（按顺序从底到顶）
             PluginParameter {
                 name: "layers"
-                value: "天地图街道,天地图街道注记"
+                value: "天地图卫星,天地图卫星注记"
             }
         }
-        map.activeMapType: map.supportedMapTypes[37]
-        map.center: QtPositioning.coordinate(39.9, 116.4) // 北京坐标
-        map.zoomLevel: 12
+        map.activeMapType: map.supportedMapTypes[1]
+        map.center: QtPositioning.coordinate(38.045474, 114.502461)
+        map.zoomLevel: 10
         map.minimumZoomLevel: 3
         map.maximumZoomLevel: 18
     }
