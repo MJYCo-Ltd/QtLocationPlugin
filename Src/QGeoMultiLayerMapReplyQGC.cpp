@@ -191,9 +191,16 @@ void QGeoMultiLayerMapReplyQGC::_startFetchingLayers() {
         if (task) {
             _cacheTasks.insert(layer.mapId(), task);
             (void)connect(task, &QGCFetchTileTask::tileFetched, this,
-                           &QGeoMultiLayerMapReplyQGC::_cacheReply);
+                          [this, mapId = layer.mapId()](QGCCacheTile *tile) {
+                              _handleCacheReply(mapId, tile);
+                          });
             (void)connect(task, &QGCMapTask::error, this,
-                           &QGeoMultiLayerMapReplyQGC::_cacheError);
+                          [this, mapId = layer.mapId()](QGCMapTask::TaskType type,
+                                                        const QString &errorString) {
+                              Q_UNUSED(type);
+                              Q_UNUSED(errorString);
+                              _handleCacheError(mapId);
+                          });
             getQGCMapEngine()->addTask(task);
             _pendingReplies++;
         }
@@ -240,6 +247,14 @@ void QGeoMultiLayerMapReplyQGC::_cacheReply(QGCCacheTile *tile) {
         return;
     }
 
+    _handleCacheReply(mapId, tile);
+}
+
+void QGeoMultiLayerMapReplyQGC::_handleCacheReply(int mapId, QGCCacheTile *tile) {
+    if (!tile) {
+        return;
+    }
+
     // 存储瓦片数据（在删除 tile 之前保存数据）
     TileImageData tileData;
     tileData.imageData = tile->img();
@@ -253,7 +268,6 @@ void QGeoMultiLayerMapReplyQGC::_cacheReply(QGCCacheTile *tile) {
     // 清理
     _cacheTasks.remove(mapId);
     delete tile;
-    task->deleteLater();
 
     // 检查是否全部完成
     _pendingReplies--;
@@ -285,6 +299,10 @@ void QGeoMultiLayerMapReplyQGC::_cacheError(QGCMapTask::TaskType type,
         return;
     }
 
+    _handleCacheError(mapId);
+}
+
+void QGeoMultiLayerMapReplyQGC::_handleCacheError(int mapId) {
     // 缓存未命中，发起网络请求
     const QGeoTileSpec &spec = tileSpec();
     const MapLayer *layer = nullptr;
@@ -300,7 +318,6 @@ void QGeoMultiLayerMapReplyQGC::_cacheError(QGCMapTask::TaskType type,
     }
 
     _cacheTasks.remove(mapId);
-    task->deleteLater();
 }
 
 void QGeoMultiLayerMapReplyQGC::_networkReplyFinished() {

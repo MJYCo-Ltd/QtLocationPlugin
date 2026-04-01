@@ -911,12 +911,12 @@ void QGCCacheWorker::_importSets(QGCMapTask *mtask) {
         task->setProgress(100);
     } else {
         // Open imported set
-        QSqlDatabase *dbImport =
-            new QSqlDatabase(QSqlDatabase::addDatabase("QSQLITE", kExportSession));
-        dbImport->setDatabaseName(task->path());
-        dbImport->setConnectOptions("QSQLITE_ENABLE_SHARED_CACHE");
-        if (dbImport->open()) {
-            QSqlQuery query(*dbImport);
+        QSqlDatabase dbImport =
+            QSqlDatabase::addDatabase("QSQLITE", kExportSession);
+        dbImport.setDatabaseName(task->path());
+        dbImport.setConnectOptions("QSQLITE_ENABLE_SHARED_CACHE");
+        if (dbImport.open()) {
+            QSqlQuery query(dbImport);
             // Prepare progress report
             quint64 tileCount = 0;
             int lastProgress = -1;
@@ -995,7 +995,7 @@ void QGCCacheWorker::_importSets(QGCMapTask *mtask) {
 
                         // Find set tiles
                         QSqlQuery cQuery(*_db);
-                        QSqlQuery subQuery(*dbImport);
+                        QSqlQuery subQuery(dbImport);
                         const QString sb =
                             QStringLiteral("SELECT * FROM Tiles WHERE tileID IN (SELECT "
                                                           "A.tileID FROM SetTiles A JOIN SetTiles B ON "
@@ -1084,14 +1084,15 @@ void QGCCacheWorker::_importSets(QGCMapTask *mtask) {
                     task->setError("No tile set in database");
                 }
             }
-            delete dbImport;
-            QSqlDatabase::removeDatabase(kExportSession);
             if (tileCount == 0) {
                 task->setError("No unique tiles in imported database");
             }
         } else {
             task->setError("Error opening import database");
         }
+        dbImport.close();
+        dbImport = QSqlDatabase();
+        QSqlDatabase::removeDatabase(kExportSession);
     }
     task->setImportCompleted();
 }
@@ -1382,6 +1383,9 @@ bool QGCCacheWorker::_createDB(QSqlDatabase &db, bool createDefault) {
 
 void QGCCacheWorker::_disconnectDB() {
     if (_db) {
+        if (_db->isOpen()) {
+            _db->close();
+        }
         _db.reset();
         QSqlDatabase::removeDatabase(kSession);
     }

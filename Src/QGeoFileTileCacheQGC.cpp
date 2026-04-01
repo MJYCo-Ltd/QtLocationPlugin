@@ -6,7 +6,7 @@
  * COPYING.md in the root of the source code directory.
  *
  ****************************************************************************/
-
+#include <mutex>
 #include "QGeoFileTileCacheQGC.h"
 #include "QGCMapEngine.h"
 #include "QGCMapTasks.h"
