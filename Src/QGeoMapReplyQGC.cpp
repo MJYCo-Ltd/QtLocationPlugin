@@ -14,6 +14,7 @@
 #include "QGCMapEngine.h"
 #include "QGCMapUrlEngine.h"
 #include "QGeoFileTileCacheQGC.h"
+#include "QGCTileSyncReader.h"
 
 #include <QGCFileDownload.h>
 
@@ -67,16 +68,34 @@ QGeoTiledMapReplyQGC::QGeoTiledMapReplyQGC(
 }
 
 void QGeoTiledMapReplyQGC::initializeFromCache() {
-    if (!_request.url().isEmpty()) {
-        QGCFetchTileTask *const task = QGeoFileTileCacheQGC::createFetchTileTask(
-            UrlFactory::getProviderTypeFromQtMapId(tileSpec().mapId()), 
-            tileSpec().x(), tileSpec().y(), tileSpec().zoom());
-        (void)connect(task, &QGCFetchTileTask::tileFetched, this,
-                       &QGeoTiledMapReplyQGC::_cacheReply);
-        (void)connect(task, &QGCMapTask::error, this,
-                       &QGeoTiledMapReplyQGC::_cacheError);
-        getQGCMapEngine()->addTask(task);
+    if (_request.url().isEmpty()) {
+        return;
     }
+    const QString providerType =
+        UrlFactory::getProviderTypeFromQtMapId(tileSpec().mapId());
+    if (providerType.isEmpty()) {
+        return;
+    }
+
+    const QString hash = UrlFactory::getTileHash(providerType, tileSpec().x(),
+                                                 tileSpec().y(), tileSpec().zoom());
+    QByteArray image;
+    QString format;
+    if (QGCTileSyncReader::tryFetchTile(QGeoFileTileCacheQGC::getDatabaseFilePath(),
+                                        hash, &image, &format)) {
+        setMapImageData(image);
+        setMapImageFormat(format);
+        setCached(true);
+        setFinished(true);
+        return;
+    }
+
+    QGCFetchTileTask *const task = QGeoFileTileCacheQGC::createFetchTileTask(
+        providerType, tileSpec().x(), tileSpec().y(), tileSpec().zoom());
+    (void)connect(task, &QGCFetchTileTask::tileFetched, this,
+                   &QGeoTiledMapReplyQGC::_cacheReply);
+    (void)connect(task, &QGCMapTask::error, this, &QGeoTiledMapReplyQGC::_cacheError);
+    (void)getQGCMapEngine()->addTask(task);
 }
 
 QGeoTiledMapReplyQGC::~QGeoTiledMapReplyQGC() {}

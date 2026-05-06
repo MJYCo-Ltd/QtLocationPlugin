@@ -12,6 +12,7 @@
 #include "ElevationMapProvider.h"
 #include "QGCMapUrlEngine.h"
 #include "QGeoFileTileCacheQGC.h"
+#include "QGCTileSyncReader.h"
 #include "QGCMapEngine.h"
 #include "QGCFileDownload.h"
 #include "QGeoTileFetcherQGC.h"
@@ -126,6 +127,24 @@ void QGeoMultiLayerMapReplyQGC::_startFetching() {
     // 文件系统未命中，尝试从数据库获取合成瓦片缓存
     QString layerStackKey = _layerStack.generateCacheKey();
     if (!layerStackKey.isEmpty()) {
+        const QString compositeHash =
+            QStringLiteral("composite_%1_%2_%3_%4")
+                .arg(layerStackKey)
+                .arg(x, 8, 10, QChar('0'))
+                .arg(y, 8, 10, QChar('0'))
+                .arg(zoom, 3, 10, QChar('0'));
+        QByteArray compositeImage;
+        QString compositeFormat;
+        if (QGCTileSyncReader::tryFetchTile(QGeoFileTileCacheQGC::getDatabaseFilePath(),
+                                            compositeHash, &compositeImage,
+                                            &compositeFormat)) {
+            setMapImageData(compositeImage);
+            setMapImageFormat(compositeFormat);
+            setCached(true);
+            setFinished(true);
+            return;
+        }
+
         QGCFetchTileTask *compositeTask = QGeoFileTileCacheQGC::createFetchCompositeTileTask(
             layerStackKey, x, y, zoom);
         if (compositeTask) {

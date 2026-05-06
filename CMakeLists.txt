@@ -32,6 +32,7 @@ set(SOURCES
     Src/QGCMapLayerConfig.cpp
     Src/QGCMapUrlEngine.cpp
     Src/QGCTileCacheWorker.cpp
+    Src/QGCTileSyncReader.cpp
     Src/QGCTileCompositor.cpp
     Src/QGeoFileTileCacheQGC.cpp
     Src/QGeoMapReplyQGC.cpp
@@ -64,6 +65,7 @@ set(HEADERS
     Inc/QGCMapUrlEngine.h
     Inc/QGCTile.h
     Inc/QGCTileCacheWorker.h
+    Inc/QGCTileSyncReader.h
     Inc/QGCTileCompositor.h
     Inc/QGCTileSet.h
     Inc/QGeoFileTileCacheQGC.h
