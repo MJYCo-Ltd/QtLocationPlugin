@@ -44,8 +44,8 @@ int QGCMapTileMonitor::pendingTileCount() const {
     return m_tiledMap ? m_tiledMap->pendingTileCount() : 0;
 }
 
-bool QGCMapTileMonitor::tilesReady() const {
-    return m_tiledMap ? m_tiledMap->tilesReady() : false;
+bool QGCMapTileMonitor::isTilesReady() const {
+    return m_tiledMap ? m_tiledMap->isTilesReady() : false;
 }
 
 void QGCMapTileMonitor::onMapReadyChanged(bool ready) {
@@ -65,7 +65,7 @@ void QGCMapTileMonitor::onMapReadyChanged(bool ready) {
 
 void QGCMapTileMonitor::syncFromTiledMap() {
     emit pendingTileCountChanged(pendingTileCount());
-    emit tilesReadyChanged(tilesReady());
+    emit tilesReadyChanged(isTilesReady());
 }
 
 void QGCMapTileMonitor::disconnectTiledMap() {

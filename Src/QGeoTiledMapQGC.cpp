@@ -10,6 +10,7 @@
 #include "QGeoTiledMapQGC.h"
 #include "QGeoTiledMappingManagerEngineQGC.h"
 
+#include <QtLocation/private/qgeocameratiles_p.h>
 #include <QtLocation/private/qgeotiledmap_p_p.h>
 #include <QtLocation/private/qgeotiledmapscene_p.h>
 #include <QtLocation/private/qgeotilespec_p.h>
@@ -21,9 +22,36 @@ constexpr int kEvalDebounceMs = 50;
 constexpr int kReadyDebounceMs = 100;
 } // namespace
 
+class QGeoTiledMapQGCPrivate : public QGeoTiledMapPrivate {
+public:
+    explicit QGeoTiledMapQGCPrivate(QGeoTiledMappingManagerEngine *engine)
+        : QGeoTiledMapPrivate(engine) {}
+
+    int countPendingTiles() const {
+        if (!m_visibleTiles || !m_mapScene) {
+            return 0;
+        }
+
+        const QSet<QGeoTileSpec> needed = m_visibleTiles->createTiles();
+        const QSet<QGeoTileSpec> textured = m_mapScene->texturedTiles();
+
+        QSet<QGeoTileSpec> pending = needed;
+        pending.subtract(textured);
+        return pending.size();
+    }
+
+    bool hasVisibleTiles() const {
+        if (!m_visibleTiles) {
+            return false;
+        }
+
+        return !m_visibleTiles->createTiles().isEmpty();
+    }
+};
+
 QGeoTiledMapQGC::QGeoTiledMapQGC(QGeoTiledMappingManagerEngineQGC *engine,
                                  QObject *parent)
-    : QGeoTiledMap(engine, parent) {
+    : QGeoTiledMap(*new QGeoTiledMapQGCPrivate(engine), engine, parent) {
     m_evalDebounce.setSingleShot(true);
     m_evalDebounce.setInterval(kEvalDebounceMs);
     m_readyDebounce.setSingleShot(true);
@@ -61,46 +89,17 @@ void QGeoTiledMapQGC::scheduleEvaluate() {
     m_evalDebounce.start();
 }
 
-int QGeoTiledMapQGC::countPendingTiles() const {
-    Q_D(const QGeoTiledMap);
-    const auto *const tiledPrivate =
-        static_cast<const QGeoTiledMapPrivate *>(d);
-
-    if (!tiledPrivate->m_visibleTiles || !tiledPrivate->m_mapScene) {
-        return 0;
-    }
-
-    const QSet<QGeoTileSpec> needed =
-        tiledPrivate->m_visibleTiles->createTiles();
-    const QSet<QGeoTileSpec> textured =
-        tiledPrivate->m_mapScene->texturedTiles();
-
-    QSet<QGeoTileSpec> pending = needed;
-    pending.subtract(textured);
-    return pending.size();
-}
-
-bool QGeoTiledMapQGC::hasVisibleTiles() const {
-    Q_D(const QGeoTiledMap);
-    const auto *const tiledPrivate =
-        static_cast<const QGeoTiledMapPrivate *>(d);
-
-    if (!tiledPrivate->m_visibleTiles) {
-        return false;
-    }
-
-    return !tiledPrivate->m_visibleTiles->createTiles().isEmpty();
-}
-
 void QGeoTiledMapQGC::evaluatePending() {
-    if (!hasVisibleTiles()) {
+    Q_D(const QGeoTiledMapQGC);
+
+    if (!d->hasVisibleTiles()) {
         m_readyDebounce.stop();
         setPendingTileCount(0);
         setTilesReady(false);
         return;
     }
 
-    const int pending = countPendingTiles();
+    const int pending = d->countPendingTiles();
     setPendingTileCount(pending);
 
     if (pending > 0) {
@@ -113,13 +112,15 @@ void QGeoTiledMapQGC::evaluatePending() {
 }
 
 void QGeoTiledMapQGC::onReadyDebounceTimeout() {
-    if (!hasVisibleTiles()) {
+    Q_D(const QGeoTiledMapQGC);
+
+    if (!d->hasVisibleTiles()) {
         setPendingTileCount(0);
         setTilesReady(false);
         return;
     }
 
-    const int pending = countPendingTiles();
+    const int pending = d->countPendingTiles();
     setPendingTileCount(pending);
 
     if (pending > 0) {

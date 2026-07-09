@@ -19,7 +19,7 @@ class QGCMapTileMonitor : public QObject {
     Q_PROPERTY(QObject *map READ map WRITE setMap NOTIFY mapChanged)
     Q_PROPERTY(int pendingTileCount READ pendingTileCount NOTIFY
                    pendingTileCountChanged)
-    Q_PROPERTY(bool tilesReady READ tilesReady NOTIFY tilesReadyChanged)
+    Q_PROPERTY(bool tilesReady READ isTilesReady NOTIFY tilesReadyChanged)
 
 public:
     explicit QGCMapTileMonitor(QObject *parent = nullptr);
@@ -28,7 +28,7 @@ public:
     void setMap(QObject *map);
 
     int pendingTileCount() const;
-    bool tilesReady() const;
+    bool isTilesReady() const;
 
 Q_SIGNALS:
     void mapChanged(QObject *map);

@@ -16,11 +16,13 @@
 Q_DECLARE_LOGGING_CATEGORY(QGeoTiledMapQGCLog)
 
 class QGeoTiledMappingManagerEngineQGC;
+class QGeoTiledMapQGCPrivate;
 
 class QGeoTiledMapQGC : public QGeoTiledMap {
     Q_OBJECT
+    Q_DECLARE_PRIVATE(QGeoTiledMapQGC)
     Q_PROPERTY(int pendingTileCount READ pendingTileCount NOTIFY pendingTileCountChanged)
-    Q_PROPERTY(bool tilesReady READ tilesReady NOTIFY tilesReadyChanged)
+    Q_PROPERTY(bool tilesReady READ isTilesReady NOTIFY tilesReadyChanged)
 
 public:
     explicit QGeoTiledMapQGC(QGeoTiledMappingManagerEngineQGC *engine,
@@ -30,7 +32,7 @@ public:
     QGeoMap::Capabilities capabilities() const final;
 
     int pendingTileCount() const { return m_pendingTileCount; }
-    bool tilesReady() const { return m_tilesReady; }
+    bool isTilesReady() const { return m_tilesReady; }
 
     void clearData() override;
 
@@ -45,8 +47,6 @@ private Q_SLOTS:
     void onReadyDebounceTimeout();
 
 private:
-    int countPendingTiles() const;
-    bool hasVisibleTiles() const;
     void setPendingTileCount(int count);
     void setTilesReady(bool ready);
 
