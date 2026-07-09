@@ -11,6 +11,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Core
     Network
     Sql
+    Quick
     Location
     Positioning
     LocationPrivate
@@ -40,6 +41,7 @@ set(SOURCES
     Src/QGeoServiceProviderPluginQGC.cpp
     Src/QGeoTiledMappingManagerEngineQGC.cpp
     Src/QGeoTiledMapQGC.cpp
+    Src/QGCMapTileMonitor.cpp
     Src/QGeoTileFetcherQGC.cpp
     Src/QmlObjectListModel.cc
     Src/Providers/BingMapProvider.cpp
@@ -74,6 +76,7 @@ set(HEADERS
     Inc/QGeoServiceProviderPluginQGC.h
     Inc/QGeoTiledMappingManagerEngineQGC.h
     Inc/QGeoTiledMapQGC.h
+    Inc/QGCMapTileMonitor.h
     Inc/QGeoTileFetcherQGC.h
     Inc/QmlObjectListModel.h
     Inc/Providers/BingMapProvider.h
@@ -100,6 +103,7 @@ qt_add_plugin(QGCLocation
 target_link_libraries(QGCLocation
     PRIVATE
         Qt6::LocationPrivate
+        Qt6::Quick
     PUBLIC
         Qt6::Core
         Qt6::Location

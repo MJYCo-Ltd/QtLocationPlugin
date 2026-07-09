@@ -8,12 +8,19 @@
  ****************************************************************************/
 
 #include "QGeoServiceProviderPluginQGC.h"
+#include "QGCMapTileMonitor.h"
 #include "QGeoTiledMappingManagerEngineQGC.h"
 
 #include <QtQml/QQmlEngine>
+#include <QtQml/qqml.h>
 
 Q_LOGGING_CATEGORY(QGeoServiceProviderFactoryQGCLog,
                    "qgc.qtlocationplugin.qgeoserviceproviderfactoryqgc")
+
+namespace {
+constexpr int kQgcMapTileMonitorVersionMajor = 1;
+constexpr int kQgcMapTileMonitorVersionMinor = 0;
+} // namespace
 
 QGeoServiceProviderFactoryQGC::QGeoServiceProviderFactoryQGC(QObject *parent)
     : QObject(parent) {}
@@ -82,4 +89,25 @@ QPlaceManagerEngine *QGeoServiceProviderFactoryQGC::createPlaceManagerEngine(
     }
 
     return nullptr;
+}
+
+void QGeoServiceProviderFactoryQGC::setQmlEngine(QQmlEngine *engine) {
+    m_engine = engine;
+    registerQmlTypes();
+}
+
+void QGeoServiceProviderFactoryQGC::registerQmlTypes() {
+    if (!m_engine) {
+        return;
+    }
+
+    static bool registered = false;
+    if (registered) {
+        return;
+    }
+    registered = true;
+
+    (void)qmlRegisterType<QGCMapTileMonitor>(
+        "QGroundControl", kQgcMapTileMonitorVersionMajor,
+        kQgcMapTileMonitorVersionMinor, "MapTileMonitor");
 }

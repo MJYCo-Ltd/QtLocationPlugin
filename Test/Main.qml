@@ -75,4 +75,11 @@ Window {
         else if (types.length === 1)
             mapView.map.activeMapType = types[0]
     }
+
+    Connections {
+        target: mapView
+        function onTilesReady() {
+            console.log("tilesReady, pending =", mapView.pendingTileCount)
+        }
+    }
 }
