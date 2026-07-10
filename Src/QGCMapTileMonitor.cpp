@@ -8,9 +8,13 @@
  ****************************************************************************/
 
 #include "QGCMapTileMonitor.h"
-#include "QGeoTiledMapQGC.h"
 
 #include <QtLocation/private/qdeclarativegeomap_p.h>
+
+namespace {
+constexpr char kPendingTileCountProperty[] = "pendingTileCount";
+constexpr char kTilesReadyStateProperty[] = "tilesReadyState";
+} // namespace
 
 QGCMapTileMonitor::QGCMapTileMonitor(QObject *parent)
     : QObject(parent) {}
@@ -41,11 +45,12 @@ void QGCMapTileMonitor::setMap(QObject *map) {
 }
 
 int QGCMapTileMonitor::pendingTileCount() const {
-    return m_tiledMap ? m_tiledMap->pendingTileCount() : 0;
+    return m_tiledMap ? m_tiledMap->property(kPendingTileCountProperty).toInt() : 0;
 }
 
 bool QGCMapTileMonitor::isTilesReady() const {
-    return m_tiledMap ? m_tiledMap->isTilesReady() : false;
+    return m_tiledMap ? m_tiledMap->property(kTilesReadyStateProperty).toBool()
+                      : false;
 }
 
 void QGCMapTileMonitor::onMapReadyChanged(bool ready) {
@@ -57,7 +62,7 @@ void QGCMapTileMonitor::onMapReadyChanged(bool ready) {
     }
 
     if (auto *declarativeMap = qobject_cast<QDeclarativeGeoMap *>(m_map)) {
-        connectTiledMap(qobject_cast<QGeoTiledMapQGC *>(declarativeMap->map()));
+        connectTiledMap(declarativeMap->map());
     }
 
     syncFromTiledMap();
@@ -77,20 +82,15 @@ void QGCMapTileMonitor::disconnectTiledMap() {
     m_tiledMap.clear();
 }
 
-void QGCMapTileMonitor::connectTiledMap(QGeoTiledMapQGC *tiledMap) {
+void QGCMapTileMonitor::connectTiledMap(QObject *tiledMap) {
     if (!tiledMap) {
         return;
     }
 
     m_tiledMap = tiledMap;
-    connect(tiledMap, &QGeoTiledMapQGC::pendingTileCountChanged, this,
-            &QGCMapTileMonitor::pendingTileCountChanged);
-    connect(tiledMap, &QGeoTiledMapQGC::tilesReadyChanged, this,
-            &QGCMapTileMonitor::tilesReadyChanged);
-    connect(tiledMap, &QGeoTiledMapQGC::tilesReady, this,
-            &QGCMapTileMonitor::tilesReady);
-}
-
-QGeoTiledMapQGC *QGCMapTileMonitor::tiledMap() const {
-    return m_tiledMap;
+    connect(tiledMap, SIGNAL(pendingTileCountChanged(int)), this,
+            SIGNAL(pendingTileCountChanged(int)));
+    connect(tiledMap, SIGNAL(tilesReadyChanged(bool)), this,
+            SIGNAL(tilesReadyChanged(bool)));
+    connect(tiledMap, SIGNAL(tilesReady()), this, SIGNAL(tilesReady()));
 }

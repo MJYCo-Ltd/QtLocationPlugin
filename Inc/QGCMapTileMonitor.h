@@ -12,14 +12,12 @@
 #include <QtCore/QObject>
 #include <QtCore/QPointer>
 
-class QGeoTiledMapQGC;
-
 class QGCMapTileMonitor : public QObject {
     Q_OBJECT
     Q_PROPERTY(QObject *map READ map WRITE setMap NOTIFY mapChanged)
     Q_PROPERTY(int pendingTileCount READ pendingTileCount NOTIFY
                    pendingTileCountChanged)
-    Q_PROPERTY(bool tilesReady READ isTilesReady NOTIFY tilesReadyChanged)
+    Q_PROPERTY(bool tilesReadyState READ isTilesReady NOTIFY tilesReadyChanged)
 
 public:
     explicit QGCMapTileMonitor(QObject *parent = nullptr);
@@ -42,9 +40,8 @@ private Q_SLOTS:
 
 private:
     void disconnectTiledMap();
-    void connectTiledMap(QGeoTiledMapQGC *tiledMap);
-    QGeoTiledMapQGC *tiledMap() const;
+    void connectTiledMap(QObject *tiledMap);
 
     QPointer<QObject> m_map;
-    QPointer<QGeoTiledMapQGC> m_tiledMap;
+    QPointer<QObject> m_tiledMap;
 };

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtLocation
 import QtPositioning
+import QGroundControl 1.0
 
 Window {
     width: 640
@@ -36,6 +37,12 @@ Window {
         map.zoomLevel: 10
         map.minimumZoomLevel: 3
         map.maximumZoomLevel: 18
+    }
+
+    MapTileMonitor {
+        id: tileMonitor
+        map: mapView.map
+        onTilesReady: console.log("tilesReady, pending =", pendingTileCount)
     }
 
     // 勿在 onActiveMapTypeChanged 里无条件 clearData：启动时 Component.onCompleted
@@ -74,12 +81,5 @@ Window {
             mapView.map.activeMapType = types[1]
         else if (types.length === 1)
             mapView.map.activeMapType = types[0]
-    }
-
-    Connections {
-        target: mapView
-        function onTilesReady() {
-            console.log("tilesReady, pending =", mapView.pendingTileCount)
-        }
     }
 }

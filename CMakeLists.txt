@@ -42,6 +42,7 @@ set(SOURCES
     Src/QGeoTiledMappingManagerEngineQGC.cpp
     Src/QGeoTiledMapQGC.cpp
     Src/QGCMapTileMonitor.cpp
+    Src/QGCQmlRegistration.cpp
     Src/QGeoTileFetcherQGC.cpp
     Src/QmlObjectListModel.cc
     Src/Providers/BingMapProvider.cpp
@@ -77,6 +78,7 @@ set(HEADERS
     Inc/QGeoTiledMappingManagerEngineQGC.h
     Inc/QGeoTiledMapQGC.h
     Inc/QGCMapTileMonitor.h
+    Inc/QGCQmlRegistration.h
     Inc/QGeoTileFetcherQGC.h
     Inc/QmlObjectListModel.h
     Inc/Providers/BingMapProvider.h

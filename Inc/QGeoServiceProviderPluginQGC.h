@@ -34,8 +34,5 @@ public:
     void setQmlEngine(QQmlEngine* engine) final;
 
 private:
-    void registerQmlTypes();
-
-private:
     QQmlEngine *m_engine = nullptr;
 };

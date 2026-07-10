@@ -22,7 +22,7 @@ class QGeoTiledMapQGC : public QGeoTiledMap {
     Q_OBJECT
     Q_DECLARE_PRIVATE(QGeoTiledMapQGC)
     Q_PROPERTY(int pendingTileCount READ pendingTileCount NOTIFY pendingTileCountChanged)
-    Q_PROPERTY(bool tilesReady READ isTilesReady NOTIFY tilesReadyChanged)
+    Q_PROPERTY(bool tilesReadyState READ isTilesReady NOTIFY tilesReadyChanged)
 
 public:
     explicit QGeoTiledMapQGC(QGeoTiledMappingManagerEngineQGC *engine,
