@@ -24,7 +24,6 @@ qt_add_qml_module(appTest
     URI Test
     QML_FILES
         Main.qml
-        MapView.qml
 )
 
 set_target_properties(appTest PROPERTIES
