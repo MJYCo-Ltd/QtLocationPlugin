@@ -22,6 +22,7 @@
 #include <QtNetwork/QSslError>
 #include <QtCore/QFile>
 #include <QtCore/QDir>
+#include <utility>
 
 Q_LOGGING_CATEGORY(QGeoMultiLayerMapReplyQGCLog,
                    "qgc.qtlocationplugin.qgeomultilayermapreplyqgc")
@@ -83,17 +84,16 @@ void QGeoMultiLayerMapReplyQGC::_startFetching() {
     int y = spec.y();
     int zoom = spec.zoom();
 
-    _pendingReplies = 0;
-
     // 首先尝试从文件系统（providers 文件夹）检查合成瓦片缓存
-    // 文件名格式: "{compositeMapId}-{zoom}-{x}-{y}.{format}"
-    if (_compositeMapId > 0) {
+    // 文件名使用完整图层栈摘要，避免短 mapId 碰撞污染缓存。
+    const QString layerStackKey = _layerStack.generateCacheKey();
+    if (!layerStackKey.isEmpty()) {
         QString cachePath = QGeoFileTileCacheQGC::getCachePath() + QLatin1String("/providers");
         // 尝试常见的图片格式
         QStringList formats = {"png", "jpg", "jpeg"};
         for (const QString &format : formats) {
-            QString filename = QString("%1-%2-%3-%4.%5")
-                              .arg(_compositeMapId)
+            QString filename = QString("composite-%1-%2-%3-%4.%5")
+                              .arg(layerStackKey)
                               .arg(zoom)
                               .arg(x)
                               .arg(y)
@@ -113,11 +113,8 @@ void QGeoMultiLayerMapReplyQGC::_startFetching() {
                     setFinished(true);
                     
                     // 同时更新数据库缓存（异步，不阻塞）
-                    QString layerStackKey = _layerStack.generateCacheKey();
-                    if (!layerStackKey.isEmpty()) {
-                        QGeoFileTileCacheQGC::cacheCompositeTile(layerStackKey, x, y, zoom,
-                                                                  imageData, format);
-                    }
+                    QGeoFileTileCacheQGC::cacheCompositeTile(layerStackKey, x, y, zoom,
+                                                              imageData, format);
                     return;
                 }
             }
@@ -125,7 +122,6 @@ void QGeoMultiLayerMapReplyQGC::_startFetching() {
     }
 
     // 文件系统未命中，尝试从数据库获取合成瓦片缓存
-    QString layerStackKey = _layerStack.generateCacheKey();
     if (!layerStackKey.isEmpty()) {
         const QString compositeHash =
             QStringLiteral("composite_%1_%2_%3_%4")
@@ -164,6 +160,8 @@ void QGeoMultiLayerMapReplyQGC::_startFetching() {
                                        setFinished(true);
                                    }
                                    delete tile;
+                               } else {
+                                   _startFetchingLayers();
                                }
                            });
             (void)connect(compositeTask, &QGCMapTask::error, this,
@@ -188,20 +186,31 @@ void QGeoMultiLayerMapReplyQGC::_startFetchingLayers() {
     int y = spec.y();
     int zoom = spec.zoom();
 
-    _pendingReplies = 0;
+    _layerStates.clear();
+    _layerErrors.clear();
+    _tiles.clear();
+
+    // 每个图层只占一个生命周期槽位。缓存未命中转网络不会改变槽位数量。
+    for (const MapLayer &layer : _visibleLayers) {
+        const SharedMapProvider provider = UrlFactory::getMapProviderFromQtMapId(layer.mapId());
+        if (!provider || zoom > provider->maximumZoomLevel() ||
+            zoom < provider->minimumZoomLevel()) {
+            _layerStates.insert(layer.mapId(), LayerState::Failed);
+            _layerErrors.append(tr("Layer %1 is unavailable at zoom %2")
+                                    .arg(layer.mapId()).arg(zoom));
+            continue;
+        }
+        _layerStates.insert(layer.mapId(), LayerState::CachePending);
+    }
 
     // 首先尝试从缓存获取单个图层
     for (const MapLayer &layer : _visibleLayers) {
+        if (_layerStates.value(layer.mapId(), LayerState::Failed) !=
+            LayerState::CachePending) {
+            continue;
+        }
         const SharedMapProvider provider = UrlFactory::getMapProviderFromQtMapId(layer.mapId());
-        if (!provider) {
-            continue;
-        }
-
-        // 检查缩放级别
-        if (zoom > provider->maximumZoomLevel() ||
-            zoom < provider->minimumZoomLevel()) {
-            continue;
-        }
+        Q_ASSERT(provider);
 
         // 尝试从缓存获取
         QString providerType = UrlFactory::getProviderTypeFromQtMapId(layer.mapId());
@@ -221,26 +230,11 @@ void QGeoMultiLayerMapReplyQGC::_startFetchingLayers() {
                               _handleCacheError(mapId);
                           });
             getQGCMapEngine()->addTask(task);
-            _pendingReplies++;
+        } else {
+            _handleCacheError(layer.mapId());
         }
     }
-
-    // 如果没有缓存任务，直接开始网络请求
-    if (_pendingReplies == 0) {
-        for (const MapLayer &layer : _visibleLayers) {
-            const SharedMapProvider provider = UrlFactory::getMapProviderFromQtMapId(layer.mapId());
-            if (!provider) {
-                continue;
-            }
-
-            if (zoom > provider->maximumZoomLevel() ||
-                zoom < provider->minimumZoomLevel()) {
-                continue;
-            }
-
-            _createLayerNetworkRequest(layer.mapId(), x, y, zoom);
-        }
-    }
+    _finishIfAllLayersComplete();
 }
 
 void QGeoMultiLayerMapReplyQGC::_cacheReply(QGCCacheTile *tile) {
@@ -288,11 +282,7 @@ void QGeoMultiLayerMapReplyQGC::_handleCacheReply(int mapId, QGCCacheTile *tile)
     _cacheTasks.remove(mapId);
     delete tile;
 
-    // 检查是否全部完成
-    _pendingReplies--;
-    if (_pendingReplies == 0) {
-        _compositeTiles();
-    }
+    _finishLayer(mapId, tileData.isValid, tr("Invalid cached tile for layer %1").arg(mapId));
 }
 
 void QGeoMultiLayerMapReplyQGC::_cacheError(QGCMapTask::TaskType type,
@@ -322,6 +312,10 @@ void QGeoMultiLayerMapReplyQGC::_cacheError(QGCMapTask::TaskType type,
 }
 
 void QGeoMultiLayerMapReplyQGC::_handleCacheError(int mapId) {
+    if (_layerStates.value(mapId, LayerState::Failed) != LayerState::CachePending) {
+        return;
+    }
+
     // 缓存未命中，发起网络请求
     const QGeoTileSpec &spec = tileSpec();
     const MapLayer *layer = nullptr;
@@ -332,11 +326,11 @@ void QGeoMultiLayerMapReplyQGC::_handleCacheError(int mapId) {
         }
     }
 
-    if (layer) {
-        _createLayerNetworkRequest(mapId, spec.x(), spec.y(), spec.zoom());
-    }
-
     _cacheTasks.remove(mapId);
+    _layerStates[mapId] = LayerState::NetworkPending;
+    if (!layer || !_createLayerNetworkRequest(mapId, spec.x(), spec.y(), spec.zoom())) {
+        _finishLayer(mapId, false, tr("Unable to create request for layer %1").arg(mapId));
+    }
 }
 
 void QGeoMultiLayerMapReplyQGC::_networkReplyFinished() {
@@ -375,15 +369,9 @@ void QGeoMultiLayerMapReplyQGC::_networkReplyFinished() {
 
     // 处理结果
     if (!processSuccess) {
-        // 处理失败，检查错误类型
-        _pendingReplies--;
-        if (_pendingReplies == 0) {
-            if (replyError != QNetworkReply::NoError) {
-                setError(QGeoTiledMapReply::CommunicationError, errorString);
-            } else {
-                setError(QGeoTiledMapReply::ParseError, tr("Failed to process tile"));
-            }
-        }
+        const QString failure = replyError != QNetworkReply::NoError
+            ? errorString : tr("Failed to process layer %1").arg(mapId);
+        _finishLayer(mapId, false, failure);
         return;
     }
 
@@ -403,40 +391,73 @@ void QGeoMultiLayerMapReplyQGC::_networkReplyFinished() {
         QGeoFileTileCacheQGC::cacheTile(mapProvider->getMapName(), spec.x(), spec.y(), spec.zoom(), image, format);
     }
 
-    // 检查是否全部完成
-    _pendingReplies--;
-    if (_pendingReplies == 0) {
-        _compositeTiles();
-    }
+    _finishLayer(mapId, tileData.isValid,
+                 tr("Invalid network tile for layer %1").arg(mapId));
 }
 
 void QGeoMultiLayerMapReplyQGC::_networkReplyError(QNetworkReply::NetworkError error) {
-    if (error != QNetworkReply::OperationCanceledError) {
-        QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender());
-        if (reply) {
-            // 保存错误信息，避免在 reply 被删除后访问
-            QString errorString = reply->errorString();
-            
-            // 找到对应的图层并清理
-            int mapId = -1;
-            for (auto it = _replies.begin(); it != _replies.end(); ++it) {
-                if (it.value() == reply) {
-                    mapId = it.key();
-                    break;
-                }
-            }
-            
-            if (mapId >= 0) {
-                reply->deleteLater();
-                _replies.remove(mapId);
-            }
-            
-            _pendingReplies--;
-            if (_pendingReplies == 0) {
-                setError(QGeoTiledMapReply::CommunicationError, errorString);
-            }
+    QNetworkReply *reply = qobject_cast<QNetworkReply *>(sender());
+    if (!reply) {
+        return;
+    }
+
+    int mapId = -1;
+    for (auto it = _replies.begin(); it != _replies.end(); ++it) {
+        if (it.value() == reply) {
+            mapId = it.key();
+            break;
         }
     }
+
+    if (mapId < 0) {
+        return;
+    }
+
+    const QString errorString = error == QNetworkReply::OperationCanceledError
+        ? tr("Layer %1 request canceled").arg(mapId) : reply->errorString();
+    reply->deleteLater();
+    _replies.remove(mapId);
+    _finishLayer(mapId, false, errorString);
+}
+
+void QGeoMultiLayerMapReplyQGC::_finishLayer(int mapId, bool success,
+                                              const QString &errorString) {
+    const LayerState state = _layerStates.value(mapId, LayerState::Failed);
+    if (state == LayerState::Succeeded || state == LayerState::Failed) {
+        return;
+    }
+
+    _layerStates[mapId] = success ? LayerState::Succeeded : LayerState::Failed;
+    if (!success && !errorString.isEmpty()) {
+        _layerErrors.append(errorString);
+    }
+    _finishIfAllLayersComplete();
+}
+
+void QGeoMultiLayerMapReplyQGC::_finishIfAllLayersComplete() {
+    if (_layerStates.isEmpty()) {
+        setError(QGeoTiledMapReply::UnknownError, tr("No fetchable layers"));
+        setFinished(true);
+        return;
+    }
+
+    for (LayerState state : std::as_const(_layerStates)) {
+        if (state == LayerState::CachePending || state == LayerState::NetworkPending) {
+            return;
+        }
+    }
+
+    for (LayerState state : std::as_const(_layerStates)) {
+        if (state == LayerState::Failed) {
+            setError(QGeoTiledMapReply::CommunicationError,
+                     _layerErrors.isEmpty() ? tr("One or more layers failed")
+                                            : _layerErrors.join(QLatin1String("; ")));
+            setFinished(true);
+            return;
+        }
+    }
+
+    _compositeTiles();
 }
 
 void QGeoMultiLayerMapReplyQGC::_networkReplySslErrors(const QList<QSslError> &errors) {
@@ -459,7 +480,7 @@ void QGeoMultiLayerMapReplyQGC::_compositeTiles() {
     }
     _compositing = true;
 
-    // 准备合成数据：只包含有效的瓦片
+    // 所有可见图层必须成功，禁止将临时缺层结果写入完整配置缓存。
     QList<MapLayer> layers;
     QList<TileImageData> tiles;
 
@@ -484,6 +505,12 @@ void QGeoMultiLayerMapReplyQGC::_compositeTiles() {
                 tiles.append(tileData);
             }
         }
+    }
+
+    if (layers.count() != _visibleLayers.count()) {
+        setError(QGeoTiledMapReply::UnknownError, tr("Incomplete layer set"));
+        setFinished(true);
+        return;
     }
 
     if (layers.isEmpty() || tiles.isEmpty()) {
@@ -529,14 +556,13 @@ void QGeoMultiLayerMapReplyQGC::_compositeTiles() {
                                                   compositeResult.imageData, compositeResult.format);
     }
 
-    // 保存到文件系统（使用 compositeMapId 作为文件名的一部分）
-    // 文件名格式: "{compositeMapId}-{zoom}-{x}-{y}.{format}"
-    if (_compositeMapId > 0) {
+    // 文件缓存与数据库缓存使用同一个完整配置摘要。
+    if (!cacheKey.isEmpty()) {
         QString cachePath = QGeoFileTileCacheQGC::getCachePath() + QLatin1String("/providers");
         QDir cacheDir;
         if (cacheDir.mkpath(cachePath)) {
-            QString filename = QString("%1-%2-%3-%4.%5")
-                              .arg(_compositeMapId)
+            QString filename = QString("composite-%1-%2-%3-%4.%5")
+                              .arg(cacheKey)
                               .arg(spec.zoom())
                               .arg(spec.x())
                               .arg(spec.y())
@@ -556,10 +582,10 @@ void QGeoMultiLayerMapReplyQGC::_compositeTiles() {
     setFinished(true);
 }
 
-void QGeoMultiLayerMapReplyQGC::_createLayerNetworkRequest(int mapId, int x, int y, int zoom) {
+bool QGeoMultiLayerMapReplyQGC::_createLayerNetworkRequest(int mapId, int x, int y, int zoom) {
     QNetworkRequest request = QGeoTileFetcherQGC::getNetworkRequest(mapId, x, y, zoom);
     if (request.url().isEmpty()) {
-        return;
+        return false;
     }
 
     // 复用父类方法创建网络请求（不连接父类信号）
@@ -576,7 +602,8 @@ void QGeoMultiLayerMapReplyQGC::_createLayerNetworkRequest(int mapId, int x, int
                        &QNetworkReply::abort);
 
         _replies.insert(mapId, reply);
-        _pendingReplies++;
+        return true;
     }
+    return false;
 }
 

@@ -12,6 +12,7 @@
 #include "MapProvider.h"
 
 #include <QtCore/QHash>
+#include <QtCore/QCryptographicHash>
 #include <QtCore/QStringList>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonArray>
@@ -55,47 +56,44 @@ MapLayer MapLayerStack::layerByMapId(int mapId) const {
 }
 
 void MapLayerStack::sort() {
-    std::sort(m_layers.begin(), m_layers.end(),
+    std::stable_sort(m_layers.begin(), m_layers.end(),
               [](const MapLayer &a, const MapLayer &b) {
-                  return a.zOrder() < b.zOrder();
+                  if (a.zOrder() != b.zOrder()) {
+                      return a.zOrder() < b.zOrder();
+                  }
+                  return a.mapId() < b.mapId();
               });
 }
 
 QString MapLayerStack::generateCacheKey() const {
-    QStringList parts;
+    QByteArray canonical;
     for (const MapLayer &layer : m_layers) {
         if (layer.visible()) {
-            parts.append(QString::number(layer.mapId()));
-            parts.append(QString::number(layer.zOrder()));
-            parts.append(QString::number(layer.opacity(), 'f', 2));
+            canonical.append(QByteArray::number(layer.mapId()));
+            canonical.append(':');
+            canonical.append(QByteArray::number(layer.zOrder()));
+            canonical.append(':');
+            canonical.append(QByteArray::number(layer.opacity(), 'g', 17));
+            canonical.append(';');
         }
     }
-    return parts.join("_");
+    return QString::fromLatin1(
+        QCryptographicHash::hash(canonical, QCryptographicHash::Sha256).toHex());
 }
 
 int MapLayerStack::generateMapId() const {
     if (m_layers.isEmpty()) {
         return -1;
     }
-    
-    // 基于图层配置生成哈希值
-    // 考虑因素：图层ID、zOrder（顺序）、opacity（透明度）、visible（可见性）
-    uint hash = 0;
-    for (const MapLayer &layer : m_layers) {
-        // 使用图层的关键属性生成哈希
-        hash ^= qHash(layer.mapId());
-        hash ^= qHash(layer.zOrder());
-        hash ^= qHash(layer.opacity());
-        hash ^= qHash(layer.visible());
-        // 旋转哈希值以增加随机性
-        hash = (hash << 1) | (hash >> 31);
+
+    bool ok = false;
+    const quint32 hashPrefix = generateCacheKey().left(8).toUInt(&ok, 16);
+    if (!ok) {
+        return -1;
     }
-    
-    // 将哈希值映射到 10000-99999 范围（避免与普通地图类型的 mapId 冲突）
-    // 普通地图类型的 mapId 通常从 1 开始，最大约 100
-    int mapId = 10000 + (hash % 90000);
-    
-    return mapId;
+
+    // 保持为正整数，并避开普通 provider 使用的低位 mapId。
+    return 10000 + static_cast<int>(hashPrefix & 0x3fffffffU);
 }
 
 MapLayerStack MapLayerStack::fromParameters(const QVariantMap &parameters) {

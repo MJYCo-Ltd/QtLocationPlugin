@@ -81,6 +81,38 @@ QGeoTiledMappingManagerEngineQGC::QGeoTiledMappingManagerEngineQGC(const QVarian
         );
         (void) mapList.append(map);
     }
+
+    if (!m_layerStack.isEmpty() && m_compositeMapId > 0) {
+        int minimumZoom = cameraCapabilities().minimumZoomLevel();
+        int maximumZoom = cameraCapabilities().maximumZoomLevel();
+        for (const MapLayer &layer : m_layerStack.layers()) {
+            if (!layer.visible()) {
+                continue;
+            }
+            const SharedMapProvider provider =
+                UrlFactory::getMapProviderFromQtMapId(layer.mapId());
+            if (provider) {
+                minimumZoom = qMax(minimumZoom, provider->minimumZoomLevel());
+                maximumZoom = qMin(maximumZoom, provider->maximumZoomLevel());
+            }
+        }
+
+        QVariantMap variantMap;
+        variantMap.insert("minimumZoomLevel", minimumZoom);
+        variantMap.insert("maximumZoomLevel", maximumZoom);
+        variantMap.insert("isComposite", true);
+        variantMap.insert("layerStackKey", m_layerStack.generateCacheKey());
+        const QString compositeName =
+            QStringLiteral("Composite_%1").arg(m_layerStack.generateCacheKey());
+        const QGeoMapType compositeMap(
+            QGeoMapType::CustomMap, compositeName, compositeName, false, false,
+            m_compositeMapId, QByteArrayLiteral("QGroundControl"),
+            cameraCapabilities(), variantMap);
+
+        // 多图层配置表示一个固定地图产品，只向 Qt Location 暴露该产品，
+        // 确保 QGeoTileSpec 使用 compositeMapId，避免普通 mapId 造成重复缓存。
+        mapList = {compositeMap};
+    }
     setSupportedMapTypes(mapList);
 
     setCacheHint(QAbstractGeoTileCache::CacheArea::AllCaches);
@@ -93,7 +125,9 @@ QGeoTiledMappingManagerEngineQGC::QGeoTiledMappingManagerEngineQGC(const QVarian
         getQGCMapEngine()->init(fileTileCache->getDatabaseFilePath());
     });
 
-    m_prefetchStyle = QGeoTiledMap::PrefetchTwoNeighbourLayers;
+    m_prefetchStyle = m_layerStack.isEmpty()
+        ? QGeoTiledMap::PrefetchTwoNeighbourLayers
+        : QGeoTiledMap::PrefetchNeighbourLayer;
 
     if (!m_networkManager) {
         m_networkManager = new QNetworkAccessManager(this);
@@ -142,64 +176,15 @@ void QGeoTiledMappingManagerEngineQGC::parseLayerConfiguration(const QVariantMap
         return;
     }
 
-    // 为多图层配置生成唯一的 mapId（基于图层、顺序、透明度）
-    m_compositeMapId = m_layerStack.generateMapId();
+    // 多图层模式只向 Qt Location 暴露一个地图类型。Qt Location 的 mapId
+    // 需要从 1 开始且连续；配置身份由独立的 SHA-256 缓存键负责。
+    m_compositeMapId = 1;
     
-    // 将多图层 mapId 注册到支持的地图类型列表中
-    // 这样 Qt Location 可以识别这个 mapId，并自动保存文件
-    QList<QGeoMapType> mapList = supportedMapTypes();
-    
-    // 检查是否已经注册过（避免重复添加）
-    bool alreadyRegistered = false;
-    for (const QGeoMapType &mapType : mapList) {
-        if (mapType.mapId() == m_compositeMapId) {
-            alreadyRegistered = true;
-            break;
-        }
-    }
-    
-    if (!alreadyRegistered && m_compositeMapId > 0) {
-        // 创建多图层合成地图类型
-        QVariantMap variantMap;
-        variantMap.insert("minimumZoomLevel", 1);
-        variantMap.insert("maximumZoomLevel", 21);
-        variantMap.insert("isComposite", true);
-        variantMap.insert("layerStackKey", m_layerStack.generateCacheKey());
-        
-        QString compositeName = QString("Composite_%1").arg(m_layerStack.generateCacheKey());
-        const QGeoMapType compositeMap = QGeoMapType(
-            QGeoMapType::CustomMap,
-            compositeName,
-            compositeName,
-            false,
-            false,
-            m_compositeMapId,
-            QByteArrayLiteral("QGroundControl"),
-            cameraCapabilities(),
-            variantMap
-        );
-        mapList.append(compositeMap);
-        setSupportedMapTypes(mapList);
-    }
-
-    // 在多图层模式下，为所有支持的 mapId 创建映射
-    // 这样无论用户选择哪个 activeMapType，都会使用相同的图层配置
-    // 确保切换 activeMapType 时地图显示不变
-    const QList<SharedMapProvider> providers = UrlFactory::getProviders();
-    for (const SharedMapProvider &provider : providers) {
-        m_mapIdToLayerStack.insert(provider->getMapId(), m_layerStack);
-    }
+    m_mapIdToLayerStack.insert(m_compositeMapId, m_layerStack);
 }
 
 MapLayerStack QGeoTiledMappingManagerEngineQGC::getLayerStackForMapId(int mapId) const
 {
-    // 如果启用了多图层模式，忽略 mapId 的变化，始终返回全局图层配置
-    // 这样切换 activeMapType 时，地图显示不会改变
-    if (!m_layerStack.isEmpty()) {
-        return m_layerStack;
-    }
-
-    // 单图层模式下，检查是否有特定映射
     if (m_mapIdToLayerStack.contains(mapId)) {
         return m_mapIdToLayerStack.value(mapId);
     }

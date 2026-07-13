@@ -128,8 +128,10 @@ void QGeoTiledMapQGC::onReadyDebounceTimeout() {
         return;
     }
 
-    setTilesReady(true);
-    emit tilesReady();
+    if (!m_tilesReady) {
+        setTilesReady(true);
+        emit tilesReady();
+    }
 }
 
 void QGeoTiledMapQGC::setPendingTileCount(int count) {

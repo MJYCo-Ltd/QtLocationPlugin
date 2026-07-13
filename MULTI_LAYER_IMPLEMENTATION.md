@@ -122,7 +122,7 @@ Map {
         PluginParameter { name: "overlayLayers"; value: "Google Labels" }
         PluginParameter { name: "overlayOpacities"; value: "0.8" }
     }
-    activeMapType: supportedMapTypes[0]
+    activeMapType: supportedMapTypes[0] // 多图层模式下唯一的 Composite 类型
 }
 ```
 

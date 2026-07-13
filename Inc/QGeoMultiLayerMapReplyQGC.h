@@ -12,6 +12,7 @@
 #include <QtCore/QLoggingCategory>
 #include <QtNetwork/QNetworkReply>
 #include <QtCore/QHash>
+#include <QtCore/QStringList>
 #include "QGeoMapReplyQGC.h"
 #include "QGCMapLayerConfig.h"
 #include "QGCTileCompositor.h"
@@ -55,8 +56,17 @@ private:
     void _handleCacheReply(int mapId, QGCCacheTile *tile);
     void _handleCacheError(int mapId);
     // 辅助方法：为指定图层创建并连接网络请求
-    void _createLayerNetworkRequest(int mapId, int x, int y, int zoom);
+    bool _createLayerNetworkRequest(int mapId, int x, int y, int zoom);
     void _handleSingleLayerReply(int mapId, const QByteArray &image, const QString &format);
+    void _finishLayer(int mapId, bool success, const QString &errorString = QString());
+    void _finishIfAllLayersComplete();
+
+    enum class LayerState {
+        CachePending,
+        NetworkPending,
+        Succeeded,
+        Failed
+    };
 
     MapLayerStack _layerStack;
     QList<MapLayer> _visibleLayers;
@@ -69,7 +79,8 @@ private:
     // 存储每个图层的缓存任务
     QHash<int, QGCFetchTileTask*> _cacheTasks;
     
-    int _pendingReplies = 0;
+    QHash<int, LayerState> _layerStates;
+    QStringList _layerErrors;
     bool _compositing = false;
 
     enum HTTP_Response {

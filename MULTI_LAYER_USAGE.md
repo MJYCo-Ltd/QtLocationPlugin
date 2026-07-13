@@ -47,10 +47,8 @@ Map {
     center: QtPositioning.coordinate(38.045474, 114.502461)
     zoomLevel: 10
     
-    // 选择基础图层作为 activeMapType
-    activeMapType: supportedMapTypes.find(function(type) {
-        return type.name === "Google Satellite"
-    })
+    // 多图层模式只暴露一个 Composite 地图类型
+    activeMapType: supportedMapTypes[0]
 }
 ```
 
@@ -79,7 +77,7 @@ Map {
         }
     }
     
-    activeMapType: supportedMapTypes[0]  // 可以是任意一个
+    activeMapType: supportedMapTypes[0]  // Composite 地图类型
 }
 ```
 
