@@ -22,16 +22,16 @@ Window {
             }
             // 单图层切换：开启 multiLayer 时引擎会固定使用 layers，忽略 activeMapType 的 mapId，
             // 不适合在这里验证「切换矢量/卫星」与 clearData。
-            //PluginParameter {
-            //    name: "multiLayer"
-            //    value: "true"
-            //}
+            PluginParameter {
+                name: "multiLayer"
+                value: "true"
+            }
 
             // 直接指定图层列表（按顺序从底到顶）
-            //PluginParameter {
-            //    name: "layers"
-            //    value: "天地图卫星,天地图卫星注记"
-            //}
+            PluginParameter {
+                name: "layers"
+                value: "天地图街道,天地图街道注记"
+        }
         }
         map.center: QtPositioning.coordinate(38.045474, 114.502461)
         map.zoomLevel: 10
@@ -43,6 +43,41 @@ Window {
         id: tileMonitor
         map: mapView.map
         onTilesReady: console.log("tilesReady, pending =", pendingTileCount)
+        onViewportReadyStateChanged: console.log(
+            "viewportReadyState =", viewportReadyState,
+            ", tilesReadyState =", tilesReadyState,
+            ", pending =", pendingTileCount)
+    }
+
+    Rectangle {
+        z: 20
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        anchors.margins: 8
+        width: viewportStatus.implicitWidth + 20
+        height: viewportStatus.implicitHeight + 16
+        radius: 6
+        color: "#CC202020"
+        border.color: tileMonitor.viewportReadyState ? "#45D483" : "#FFB547"
+
+        Text {
+            id: viewportStatus
+            anchors.centerIn: parent
+            color: "white"
+            font.pixelSize: 13
+            text: "视口可截图: " + (tileMonitor.viewportReadyState ? "是" : "否")
+                  + "\n瓦片齐全: " + (tileMonitor.tilesReadyState ? "是" : "否")
+                  + "  待处理: " + tileMonitor.pendingTileCount
+        }
+    }
+
+    Button {
+        z: 20
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 8
+        text: "重新检查视口"
+        onClicked: tileMonitor.beginViewportChange()
     }
 
     // 勿在 onActiveMapTypeChanged 里无条件 clearData：启动时 Component.onCompleted
