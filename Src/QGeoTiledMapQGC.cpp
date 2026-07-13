@@ -59,9 +59,9 @@ QGeoTiledMapQGC::QGeoTiledMapQGC(QGeoTiledMappingManagerEngineQGC *engine,
 
     connect(this, &QGeoMap::sgNodeChanged, this, &QGeoTiledMapQGC::scheduleEvaluate);
     connect(this, &QGeoMap::cameraDataChanged, this,
-            &QGeoTiledMapQGC::scheduleEvaluate);
+            &QGeoTiledMapQGC::beginViewportChange);
     connect(this, &QGeoMap::visibleAreaChanged, this,
-            &QGeoTiledMapQGC::scheduleEvaluate);
+            &QGeoTiledMapQGC::beginViewportChange);
     connect(&m_evalDebounce, &QTimer::timeout, this,
             &QGeoTiledMapQGC::evaluatePending);
     connect(&m_readyDebounce, &QTimer::timeout, this,
@@ -79,9 +79,16 @@ void QGeoTiledMapQGC::clearData() {
     m_evalDebounce.stop();
     m_readyDebounce.stop();
     setTilesReady(false);
+    setViewportReady(false);
     setPendingTileCount(0);
 
     QGeoTiledMap::clearData();
+    scheduleEvaluate();
+}
+
+void QGeoTiledMapQGC::beginViewportChange() {
+    m_readyDebounce.stop();
+    setViewportReady(false);
     scheduleEvaluate();
 }
 
@@ -96,6 +103,7 @@ void QGeoTiledMapQGC::evaluatePending() {
         m_readyDebounce.stop();
         setPendingTileCount(0);
         setTilesReady(false);
+        setViewportReady(false);
         return;
     }
 
@@ -105,6 +113,7 @@ void QGeoTiledMapQGC::evaluatePending() {
     if (pending > 0) {
         m_readyDebounce.stop();
         setTilesReady(false);
+        setViewportReady(false);
         return;
     }
 
@@ -117,6 +126,7 @@ void QGeoTiledMapQGC::onReadyDebounceTimeout() {
     if (!d->hasVisibleTiles()) {
         setPendingTileCount(0);
         setTilesReady(false);
+        setViewportReady(false);
         return;
     }
 
@@ -125,6 +135,7 @@ void QGeoTiledMapQGC::onReadyDebounceTimeout() {
 
     if (pending > 0) {
         setTilesReady(false);
+        setViewportReady(false);
         return;
     }
 
@@ -132,6 +143,7 @@ void QGeoTiledMapQGC::onReadyDebounceTimeout() {
         setTilesReady(true);
         emit tilesReady();
     }
+    setViewportReady(true);
 }
 
 void QGeoTiledMapQGC::setPendingTileCount(int count) {
@@ -150,4 +162,13 @@ void QGeoTiledMapQGC::setTilesReady(bool ready) {
 
     m_tilesReady = ready;
     emit tilesReadyChanged(m_tilesReady);
+}
+
+void QGeoTiledMapQGC::setViewportReady(bool ready) {
+    if (m_viewportReady == ready) {
+        return;
+    }
+
+    m_viewportReady = ready;
+    emit viewportReadyStateChanged(m_viewportReady);
 }

@@ -14,6 +14,7 @@
 namespace {
 constexpr char kPendingTileCountProperty[] = "pendingTileCount";
 constexpr char kTilesReadyStateProperty[] = "tilesReadyState";
+constexpr char kViewportReadyStateProperty[] = "viewportReadyState";
 } // namespace
 
 QGCMapTileMonitor::QGCMapTileMonitor(QObject *parent)
@@ -53,6 +54,19 @@ bool QGCMapTileMonitor::isTilesReady() const {
                       : false;
 }
 
+bool QGCMapTileMonitor::isViewportReady() const {
+    return m_tiledMap
+        ? m_tiledMap->property(kViewportReadyStateProperty).toBool()
+        : false;
+}
+
+void QGCMapTileMonitor::beginViewportChange() {
+    if (m_tiledMap) {
+        QMetaObject::invokeMethod(m_tiledMap, "beginViewportChange",
+                                  Qt::DirectConnection);
+    }
+}
+
 void QGCMapTileMonitor::onMapReadyChanged(bool ready) {
     disconnectTiledMap();
 
@@ -71,6 +85,7 @@ void QGCMapTileMonitor::onMapReadyChanged(bool ready) {
 void QGCMapTileMonitor::syncFromTiledMap() {
     emit pendingTileCountChanged(pendingTileCount());
     emit tilesReadyChanged(isTilesReady());
+    emit viewportReadyStateChanged(isViewportReady());
 }
 
 void QGCMapTileMonitor::disconnectTiledMap() {
@@ -93,4 +108,6 @@ void QGCMapTileMonitor::connectTiledMap(QObject *tiledMap) {
     connect(tiledMap, SIGNAL(tilesReadyChanged(bool)), this,
             SIGNAL(tilesReadyChanged(bool)));
     connect(tiledMap, SIGNAL(tilesReady()), this, SIGNAL(tilesReady()));
+    connect(tiledMap, SIGNAL(viewportReadyStateChanged(bool)), this,
+            SIGNAL(viewportReadyStateChanged(bool)));
 }

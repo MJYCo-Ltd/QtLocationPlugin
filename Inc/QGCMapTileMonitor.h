@@ -18,6 +18,8 @@ class QGCMapTileMonitor : public QObject {
     Q_PROPERTY(int pendingTileCount READ pendingTileCount NOTIFY
                    pendingTileCountChanged)
     Q_PROPERTY(bool tilesReadyState READ isTilesReady NOTIFY tilesReadyChanged)
+    Q_PROPERTY(bool viewportReadyState READ isViewportReady NOTIFY
+                   viewportReadyStateChanged)
 
 public:
     explicit QGCMapTileMonitor(QObject *parent = nullptr);
@@ -27,12 +29,16 @@ public:
 
     int pendingTileCount() const;
     bool isTilesReady() const;
+    bool isViewportReady() const;
+
+    Q_INVOKABLE void beginViewportChange();
 
 Q_SIGNALS:
     void mapChanged(QObject *map);
     void pendingTileCountChanged(int pendingTileCount);
     void tilesReadyChanged(bool ready);
     void tilesReady();
+    void viewportReadyStateChanged(bool ready);
 
 private Q_SLOTS:
     void onMapReadyChanged(bool ready);

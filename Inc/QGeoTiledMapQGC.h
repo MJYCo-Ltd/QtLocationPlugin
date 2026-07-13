@@ -23,6 +23,8 @@ class QGeoTiledMapQGC : public QGeoTiledMap {
     Q_DECLARE_PRIVATE(QGeoTiledMapQGC)
     Q_PROPERTY(int pendingTileCount READ pendingTileCount NOTIFY pendingTileCountChanged)
     Q_PROPERTY(bool tilesReadyState READ isTilesReady NOTIFY tilesReadyChanged)
+    Q_PROPERTY(bool viewportReadyState READ isViewportReady NOTIFY
+                   viewportReadyStateChanged)
 
 public:
     explicit QGeoTiledMapQGC(QGeoTiledMappingManagerEngineQGC *engine,
@@ -33,6 +35,9 @@ public:
 
     int pendingTileCount() const { return m_pendingTileCount; }
     bool isTilesReady() const { return m_tilesReady; }
+    bool isViewportReady() const { return m_viewportReady; }
+
+    Q_INVOKABLE void beginViewportChange();
 
     void clearData() override;
 
@@ -40,6 +45,7 @@ Q_SIGNALS:
     void pendingTileCountChanged(int pendingTileCount);
     void tilesReadyChanged(bool ready);
     void tilesReady();
+    void viewportReadyStateChanged(bool ready);
 
 private Q_SLOTS:
     void scheduleEvaluate();
@@ -49,9 +55,11 @@ private Q_SLOTS:
 private:
     void setPendingTileCount(int count);
     void setTilesReady(bool ready);
+    void setViewportReady(bool ready);
 
     QTimer m_evalDebounce;
     QTimer m_readyDebounce;
     int m_pendingTileCount = 0;
     bool m_tilesReady = false;
+    bool m_viewportReady = false;
 };
